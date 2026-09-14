@@ -1,15 +1,19 @@
-# Um espaço para ler
+# A reading space
 
-Três caminhos para voltar aos textos que merecem atenção.
+Three paths back to the texts that deserve attention.
 
-## O que estamos explorando
+## What we are exploring
 
-Uma biblioteca pode convidar à leitura sem transformar cada texto em mais uma tarefa? Compare a descoberta editorial, uma lista compacta e uma leitura em foco.
+Can a library invite reading without turning every text into another task? Compare editorial discovery, a compact list, and a focused reading view.
 
-## Experimente
+## Try it
 
-Abra um protótipo, filtre a biblioteca e guarde um texto. Na alternativa em foco, ajuste o tamanho da letra. Os controles são reais e funcionam localmente.
+Open a prototype, filter the library, and save a text. In the focus alternative, adjust font size. Controls are real and run locally.
 
-## Deixe uma intenção
+## Leave an intention
 
-Use Inspecionar para apontar um elemento, ou Região para comentar sobre uma área. O feedback fica em `.draftroom/feedback.jsonl`, ao lado dos protótipos.
+Use **Inspect** to point at an element, or **Region** to comment on an area. Feedback lives in `.draftroom/feedback.jsonl` next to the prototypes.
+
+## Open this workspace
+
+Ask your agent to start Draft for this folder, or say: *"Start the viewer for this workspace and give me the URL."* See `AGENTS.md` for the full agent contract.

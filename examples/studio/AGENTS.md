@@ -1,14 +1,33 @@
-# Instruções do workspace
+# Workspace instructions (Draft)
 
-Esta pasta é um workspace Draftroom portátil. Ela contém protótipos e manifesto; não contém o código-fonte do viewer.
+This folder is a **portable Draft workspace** — prototypes and manifest only, not the viewer source code.
 
-Quando o usuário pedir para iniciar o Draftroom:
+When the user asks to open or start Draft:
 
-1. preserve todos os arquivos desta pasta;
-2. valide `experiment.json` e os caminhos dos frames;
-3. procure um comando `protofield` já instalado ou um runtime fornecido pelo usuário;
-4. execute `protofield inspect .` antes de abrir, quando possível;
-5. execute `protofield open .` e informe a URL local;
-6. pare diante de erro de manifesto ou asset, sem reescrever o workspace automaticamente.
+1. **Preserve** every file in this workspace. Do not delete, move, or rewrite `experiment.json`, frames, or `.draftroom/` without explicit permission.
+2. **Validate** with `protofield inspect .` when a runtime is available.
+3. **Locate a runtime** (in order):
+   - `protofield` on `PATH`
+   - `node_modules/.bin/protofield` next to a Draft checkout
+   - `node ../path/to/draft/dist/runtime/cli.js` from a local clone (`npm run build` first)
+   - a `protofield-*.tgz` tarball supplied with the workspace
+4. If no runtime exists, **stop and report** what is missing. Do not install global tools or clone repos without user approval.
+5. **Start** with `protofield open .` (or `node …/cli.js open .`). Print the local URL and keep the process running.
+6. On manifest or asset errors, show the exact message. Do not auto-fix before explaining.
 
-O workspace pode conter feedback e ajustes locais em `.draftroom/`. Esses arquivos são dados de trabalho e não devem ser apagados durante a inicialização.
+## Designer prompt (copy-paste)
+
+```text
+This folder is my Draft workspace. Start the viewer for the current directory, tell me the URL, and keep it running. Do not change my prototype files.
+```
+
+## What lives here
+
+| Path | Purpose |
+| --- | --- |
+| `experiment.json` | Frame list, titles, entry HTML, viewports |
+| `frames/` | One folder per prototype |
+| `README.md` | Context for this study |
+| `.draftroom/` | Local layout, feedback, visual edits (optional) |
+
+The HTML source is never rewritten by the viewer; overrides stay in `.draftroom/edits.json`.
