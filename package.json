@@ -12,6 +12,7 @@
   "files": [
     "dist",
     "LICENSE",
+    "NOTICE",
     "examples/studio/experiment.json",
     "examples/studio/README.md",
     "examples/studio/AGENTS.md",
