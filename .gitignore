@@ -11,7 +11,7 @@ playwright-report/
 /.cursor/
 
 # Internal construction docs (not for the public repo)
-/README.md
+/README.local.md
 /AGENTS.md
 /PLANO-DRAFTROOM.md
 /PADROES.md
