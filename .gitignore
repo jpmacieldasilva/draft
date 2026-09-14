@@ -1,0 +1,22 @@
+node_modules/
+dist/
+lib/
+legacy/
+docs/
+*.tgz
+test-results/
+playwright-report/
+.DS_Store
+.env*
+.cursor/
+
+# Internal construction docs (not for the public repo)
+/README.md
+/AGENTS.md
+/PLANO-DRAFTROOM.md
+/PADROES.md
+/VERSOES.md
+/PESQUISA.md
+
+# Demo workspace local state
+examples/**/.draftroom/

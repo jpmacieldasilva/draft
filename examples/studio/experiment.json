@@ -1,0 +1,9 @@
+{
+  "id": "reading-room",
+  "title": "Um espaço para ler",
+  "frames": [
+    { "id": "editorial", "title": "Biblioteca editorial", "entry": "frames/editorial/index.html", "viewport": { "width": 390, "height": 620 } },
+    { "id": "compact", "title": "Leitura em movimento", "entry": "frames/compact/index.html", "viewport": { "width": 390, "height": 620 } },
+    { "id": "focus", "title": "Um texto por vez", "entry": "frames/focus/index.html", "viewport": { "width": 390, "height": 620 } }
+  ]
+}

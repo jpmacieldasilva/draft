@@ -1,0 +1,7 @@
+const search = document.querySelector('input');
+const rows = [...document.querySelectorAll('[data-title]')];
+if (search) search.addEventListener('input', () => rows.forEach(row => {row.hidden = !row.dataset.title.toLowerCase().includes(search.value.toLowerCase());}));
+document.querySelectorAll('[data-save]').forEach(button => button.addEventListener('click', () => {const saved = button.getAttribute('aria-pressed') !== 'true'; button.setAttribute('aria-pressed', String(saved)); button.textContent = saved ? 'Guardado ✓' : 'Guardar'; document.querySelector('#notice').textContent = saved ? 'Texto guardado na sua biblioteca.' : 'Texto removido dos guardados.';}));
+document.querySelectorAll('[data-filter]').forEach(button => button.addEventListener('click', () => {document.querySelectorAll('[data-filter]').forEach(other => {other.classList.toggle('active', other === button);other.setAttribute('aria-pressed', String(other === button));});rows.forEach((row, index) => {row.hidden = button.dataset.filter === 'saved' && index > 1;});}));
+document.querySelector('[data-size]')?.addEventListener('click', () => {const article = document.querySelector('.article');const large = article.style.fontSize === '20px';article.style.fontSize = large ? '17px' : '20px';});
+document.querySelector('[data-finish]')?.addEventListener('click', event => {event.currentTarget.textContent = 'Leitura concluída ✓';document.querySelector('.progress span').style.width = '100%';});

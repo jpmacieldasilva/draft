@@ -1,0 +1,48 @@
+{
+  "name": "protofield",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "bin": {
+    "protofield": "dist/runtime/cli.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "examples/studio/experiment.json",
+    "examples/studio/README.md",
+    "examples/studio/AGENTS.md",
+    "examples/studio/frames",
+    "examples/studio/shared"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.runtime.json && vite build",
+    "demo": "npm run build && node dist/runtime/cli.js open examples/studio",
+    "start": "node dist/runtime/cli.js open",
+    "test": "tsx --test tests/*.test.ts",
+    "test:e2e": "playwright test",
+    "check": "tsc --noEmit",
+    "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@astryxdesign/cli": "^0.6.1",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.5.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "@astryxdesign/core": "^0.6.1",
+    "@astryxdesign/theme-neutral": "^0.6.1",
+    "@stylexjs/stylex": "^0.19.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "lucide-react": "1.46.0"
+  }
+}
