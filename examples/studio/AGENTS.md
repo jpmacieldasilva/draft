@@ -4,15 +4,15 @@ This folder is a **portable Draft workspace** — prototypes and manifest only, 
 
 When the user asks to open or start Draft:
 
-1. **Preserve** every file in this workspace. Do not delete, move, or rewrite `experiment.json`, frames, or `.draftroom/` without explicit permission.
-2. **Validate** with `protofield inspect .` when a runtime is available.
+1. **Preserve** every file in this workspace. Do not delete, move, or rewrite `experiment.json`, frames, or `.draft/` without explicit permission.
+2. **Validate** with `draft inspect .` when a runtime is available.
 3. **Locate a runtime** (in order):
-   - `protofield` on `PATH`
-   - `node_modules/.bin/protofield` next to a Draft checkout
+   - `draft` on `PATH`
+   - `node_modules/.bin/draft` next to a Draft checkout
    - `node ../path/to/draft/dist/runtime/cli.js` from a local clone (`npm run build` first)
-   - a `protofield-*.tgz` tarball supplied with the workspace
+   - a `draft-viewer-*.tgz` tarball supplied with the workspace
 4. If no runtime exists, **stop and report** what is missing. Do not install global tools or clone repos without user approval.
-5. **Start** with `protofield open .` (or `node …/cli.js open .`). Print the local URL and keep the process running.
+5. **Start** with `draft open .` (or `node …/cli.js open .`). Print the local URL and keep the process running.
 6. On manifest or asset errors, show the exact message. Do not auto-fix before explaining.
 
 ## Designer prompt (copy-paste)
@@ -28,6 +28,6 @@ This folder is my Draft workspace. Start the viewer for the current directory, t
 | `experiment.json` | Frame list, titles, entry HTML, viewports |
 | `frames/` | One folder per prototype |
 | `README.md` | Context for this study |
-| `.draftroom/` | Local layout, feedback, visual edits (optional) |
+| `.draft/` | Local layout, feedback, visual edits (optional) |
 
-The HTML source is never rewritten by the viewer; overrides stay in `.draftroom/edits.json`.
+Inspector edits are written into the prototype HTML/CSS in `frames/`. Commit those files when the designer saves changes. `.draft/` holds layout, feedback, and undo baselines only.

@@ -1,5 +1,5 @@
 {
-  "name": "protofield",
+  "name": "draft-viewer",
   "version": "0.3.0",
   "private": true,
   "type": "module",
@@ -7,7 +7,7 @@
     "node": ">=22.12"
   },
   "bin": {
-    "protofield": "dist/runtime/cli.js"
+    "draft": "dist/runtime/cli.js"
   },
   "files": [
     "dist",
@@ -31,19 +31,23 @@
   },
   "devDependencies": {
     "@astryxdesign/cli": "^0.6.1",
+    "@astryxdesign/core": "^0.6.1",
+    "@astryxdesign/theme-neutral": "^0.6.1",
     "@playwright/test": "^1.63.0",
+    "@stylexjs/stylex": "^0.19.0",
     "@types/node": "^26.5.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
-    "tsx": "^4.23.13",
-    "typescript": "^7.0.2",
-    "vite": "^8.3.0",
-    "@astryxdesign/core": "^0.6.1",
-    "@astryxdesign/theme-neutral": "^0.6.1",
-    "@stylexjs/stylex": "^0.19.0",
+    "lucide-react": "1.46.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "lucide-react": "1.46.0"
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "node-html-parser": "^9.0.4",
+    "postcss": "^8.5.28"
   }
 }

@@ -16,8 +16,11 @@ npm ci
 npm run check
 npm run build
 npm test
-npm run test:e2e   # needs: npx playwright install chromium
+npx playwright install chromium
+npm run test:e2e
 ```
+
+Headless e2e is fine for CI. For UI changes, also verify in a real browser (canvas, presentation, inspect).
 
 ## Pull requests
 

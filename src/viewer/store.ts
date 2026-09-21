@@ -24,7 +24,7 @@ export function acceptWorkspace(workspace: Workspace, first = false) {
  for (const frame of workspace.experiment.frames) { if (!layout.frames[frame.id]) { layout.frames[frame.id] = {...frame.viewport, x: nextX, y: 0}; nextX += frame.viewport.width + 64; } }
  update({workspace, layout, busy: false, error: undefined});
  requestAnimationFrame(()=>iframes.forEach((_iframe,id)=>syncBridge(id)));
- if (first) { readRoute(); if (!workspace.layout) fit(); }
+ if (first) { if (!workspace.layout) fit(); readRoute(); queueMicrotask(readRoute); }
 }
 export async function discardLayoutConflict() { layoutDirty = false; await refresh(); }
 export async function refresh() {
@@ -35,7 +35,7 @@ export async function mutate(path: string, body: unknown) {
  if (state.workspace?.readOnly) return;
  update({busy: true, error: undefined});
  try {
-  const response = await fetch(`./api/${path}`, {method:'POST',headers:{'Content-Type':'application/json','X-Draftroom-Token':state.workspace?.token ?? ''},body:JSON.stringify(body)});
+  const response = await fetch(`./api/${path}`, {method:'POST',headers:{'Content-Type':'application/json','X-Draft-Token':state.workspace?.token ?? ''},body:JSON.stringify(body)});
   const result = await response.json();
   if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Não foi possível salvar.');
   acceptWorkspace(result);
@@ -52,7 +52,7 @@ async function persistLayout() {
  layoutSaving=true;
  update({busy:true});
  try {
-  const response=await fetch('./api/layout',{method:'POST',headers:{'Content-Type':'application/json','X-Draftroom-Token':state.workspace?.token??''},body:JSON.stringify({layout:state.layout,revision:layoutRevision})});
+  const response=await fetch('./api/layout',{method:'POST',headers:{'Content-Type':'application/json','X-Draft-Token':state.workspace?.token??''},body:JSON.stringify({layout:state.layout,revision:layoutRevision})});
   const result=await response.json();
   if(!response.ok) throw new Error(typeof result.error==='string'?result.error:'Não foi possível salvar a composição.');
   layoutRevision=result.revision;
@@ -83,7 +83,6 @@ export function setMode(mode: Mode) { update({mode}); iframes.forEach(iframe => 
 export function syncBridge(frameId: string) {
  const frame=iframes.get(frameId)?.contentWindow;
  frame?.postMessage({type:'draftroom:mode',mode:state.mode}, '*');
- frame?.postMessage({type:'draftroom:overrides',edits:state.workspace?.edits?.filter(edit=>edit.frameId===frameId)??[]},'*');
 }
 export function present(frameId: string) { update({presenting:frameId, selected:frameId, info:undefined}); location.hash = `frame/${encodeURIComponent(frameId)}`; }
 export function leavePresentation() { update({presenting:undefined}); history.replaceState(null,'',`${location.pathname}${location.search}`); if(document.fullscreenElement) void document.exitFullscreen(); }

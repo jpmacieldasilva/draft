@@ -1,7 +1,8 @@
 import { randomUUID, createHash } from 'node:crypto';
-import { readFile, realpath, mkdir, writeFile, rename, appendFile, cp, access, lstat } from 'node:fs/promises';
+import { readFile, realpath, mkdir, writeFile, rename, appendFile, cp, access, lstat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import type { Experiment, Frame, Feedback, Layout, Target, Workspace, VisualEdit, Connection } from '../protocol.js';
+import { applyEdit, captureBaseline, revertBaseline, type EditBaseline } from './prototype-writer.js';
 
 export class RequestError extends Error { constructor(message: string, public status = 400) { super(message); } }
 export function record(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
@@ -15,6 +16,9 @@ export async function confined(root: string, relative: string): Promise<string> 
   return resolved;
 }
 async function optionalText(root: string, relative: string) { try { return await readFile(await confined(root, relative), 'utf8'); } catch { return ''; } }
+const STATE_DIR = '.draft';
+const LEGACY_STATE_DIR = '.draftroom';
+async function readStateFile(root: string, filename: string) { const primary = await optionalText(root, `${STATE_DIR}/${filename}`); return primary || await optionalText(root, `${LEGACY_STATE_DIR}/${filename}`); }
 function validViewport(value: unknown): value is Record<string, unknown> & { width: number; height: number } { return record(value) && typeof value.width === 'number' && typeof value.height === 'number' && value.width >= 160 && value.width <= 4000 && value.height >= 120 && value.height <= 4000; }
 function parseExperiment(value: unknown): Experiment {
   if (!record(value) || !Array.isArray(value.frames)) throw new RequestError('experiment.json precisa conter frames.');
@@ -24,7 +28,7 @@ function parseExperiment(value: unknown): Experiment {
     seen.add(frame.id);
     return { id: frame.id, title: typeof frame.title === 'string' ? frame.title : frame.id, entry: typeof frame.entry === 'string' ? frame.entry : '', viewport: validViewport(frame.viewport) ? frame.viewport : { width: 960, height: 720 } };
   });
-  return { id: typeof value.id === 'string' ? value.id : 'workspace', title: typeof value.title === 'string' ? value.title : 'Draftroom', frames };
+  return { id: typeof value.id === 'string' ? value.id : 'workspace', title: typeof value.title === 'string' ? value.title : 'Draft', frames };
 }
 export interface WorkspaceDiscovery { experiment: Experiment; generated: boolean }
 export async function discoverExperiment(root: string): Promise<WorkspaceDiscovery> {
@@ -105,10 +109,41 @@ export class WorkspaceStore {
   token = randomUUID();
   contentOrigin = '';
   private queue: Promise<unknown> = Promise.resolve();
+  private migratedEdits = false;
   constructor(public root: string) {}
-  async initialize() { this.root = await realpath(this.root); await this.snapshot(); }
+  async initialize() { this.root = await realpath(this.root); await this.migrateLegacyEdits(); await this.snapshot(); }
+  private baselineKey(frameId: string, selector: string) { return `${frameId}:${selector}`; }
+  private async loadBaselines(): Promise<Record<string, EditBaseline>> {
+    const source = await readStateFile(this.root, 'baselines.json');
+    if (!source) return {};
+    try { const parsed: unknown = JSON.parse(source); return record(parsed) ? parsed as Record<string, EditBaseline> : {}; } catch { return {}; }
+  }
+  private async saveBaselines(baselines: Record<string, EditBaseline>) {
+    await this.stateDirectory();
+    await this.atomic(`${STATE_DIR}/baselines.json`, baselines);
+  }
+  private async migrateLegacyEdits() {
+    if (this.migratedEdits) return;
+    this.migratedEdits = true;
+    const source = await readStateFile(this.root, 'edits.json');
+    if (!source) return;
+    let values: unknown;
+    try { values = JSON.parse(source); if (!Array.isArray(values)) return; } catch { return; }
+    const { experiment } = await discoverExperiment(this.root);
+    for (const entry of values) {
+      try {
+        const edit = validateEdit(entry);
+        const frame = experiment.frames.find(candidate => candidate.id === edit.frameId);
+        if (frame) await applyEdit(this.root, frame, edit);
+      } catch { /* ignore invalid legacy edits */ }
+    }
+    for (const relative of [`${STATE_DIR}/edits.json`, `${LEGACY_STATE_DIR}/edits.json`]) {
+      try { await unlink(await confined(this.root, relative)); } catch { /* already removed */ }
+    }
+  }
   async snapshot(): Promise<Workspace> {
     this.root = await realpath(this.root);
+    await this.migrateLegacyEdits();
     const diagnostics: string[] = [];
     let experiment: Experiment = { id: 'invalid', title: path.basename(this.root), frames: [] };
     try { experiment = (await discoverExperiment(this.root)).experiment; } catch (error) { diagnostics.push(error instanceof Error ? error.message : 'Manifesto inválido.'); }
@@ -116,29 +151,37 @@ export class WorkspaceStore {
       try { if (!publicPath(frame.entry) || path.extname(frame.entry) !== '.html') throw new Error('A entrada precisa ser um HTML público.'); const resolvedEntry = await confined(this.root, frame.entry); if (!publicPath(path.relative(this.root, resolvedEntry))) throw new Error('Entrada privada.'); frame.url = `${this.contentOrigin}/${frame.entry.split('/').map(encodeURIComponent).join('/')}`; } catch { frame.error = 'Não foi possível abrir o HTML deste frame.'; }
       frame.readme = await optionalText(this.root, path.join(path.dirname(frame.entry), 'README.md'));
     }
-    const layoutText = await optionalText(this.root, '.draftroom/layout.json');
+    const layoutText = await readStateFile(this.root, 'layout.json');
     let layout: Layout | null = null;
     try { if (layoutText) layout = validateLayout(JSON.parse(layoutText)); } catch { diagnostics.push('Layout inválido; composição padrão restaurada.'); }
     const feedback = new Map<string, Feedback>();
-    for (const line of (await optionalText(this.root, '.draftroom/feedback.jsonl')).split('\n').filter(Boolean)) {
+    for (const line of (await readStateFile(this.root, 'feedback.jsonl')).split('\n').filter(Boolean)) {
       try { const event: unknown = JSON.parse(line); if (record(event) && typeof event.id === 'string' && typeof event.frameId === 'string' && typeof event.message === 'string' && typeof event.createdAt === 'string' && typeof event.eventId === 'string') feedback.set(event.id, { event: event.event === 'resolved' ? 'resolved' : event.event === 'reopened' ? 'reopened' : 'created', id: event.id, eventId: event.eventId, frameId: event.frameId, message: event.message, createdAt: event.createdAt, status: event.status === 'resolved' ? 'resolved' : 'open', target: validateTarget(event.target) }); } catch { diagnostics.push('Uma linha inválida de feedback foi ignorada.'); }
     }
-    let edits:VisualEdit[]=[];
-    try {const source=await optionalText(this.root,'.draftroom/edits.json');if(source){const values:unknown=JSON.parse(source);if(!Array.isArray(values))throw new Error();edits=values.map(validateEdit);}}catch{diagnostics.push('Ajustes visuais inválidos; verifique edits.json.');}
-    return { experiment, readme: await optionalText(this.root, 'README.md'), feedback: [...feedback.values()], layout, revision: createHash('sha256').update(layoutText).digest('hex'), token: this.token, readOnly: false, diagnostics, edits };
+    return { experiment, readme: await optionalText(this.root, 'README.md'), feedback: [...feedback.values()], layout, revision: createHash('sha256').update(layoutText).digest('hex'), token: this.token, readOnly: false, diagnostics };
   }
-  private async stateDirectory() { const directory = path.join(this.root, '.draftroom'); await mkdir(directory, { recursive: true }); if ((await lstat(directory)).isSymbolicLink()) throw new RequestError('A pasta de estado não pode ser um symlink.', 403); return confined(this.root, '.draftroom'); }
+  private async stateDirectory() { const directory = path.join(this.root, STATE_DIR); await mkdir(directory, { recursive: true }); if ((await lstat(directory)).isSymbolicLink()) throw new RequestError('A pasta de estado não pode ser um symlink.', 403); return confined(this.root, STATE_DIR); }
   private async atomic(relative: string, value: unknown) { const directory = await confined(this.root, path.dirname(relative)); const destination = path.join(directory, path.basename(relative)); try { await confined(this.root, relative); } catch (error) { if (error instanceof RequestError) throw error; } const temporary = `${destination}.${randomUUID()}.tmp`; await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { flag: 'wx' }); await rename(temporary, destination); }
   mutate(operation: () => Promise<void>): Promise<Workspace> { const result = this.queue.then(async () => { this.root = await realpath(this.root); await operation(); return this.snapshot(); }); this.queue = result.catch(() => {}); return result; }
-  saveLayout(body: Record<string, unknown>) { return this.mutate(async () => { const workspace = await this.snapshot(); if (body.revision !== workspace.revision) throw new RequestError('A composição mudou. Recarregue antes de salvar.', 409); const layout = validateLayout(body.layout); await this.stateDirectory(); await this.atomic('.draftroom/layout.json', layout); }); }
+  saveLayout(body: Record<string, unknown>) { return this.mutate(async () => { const workspace = await this.snapshot(); if (body.revision !== workspace.revision) throw new RequestError('A composição mudou. Recarregue antes de salvar.', 409); const layout = validateLayout(body.layout); await this.stateDirectory(); await this.atomic(`${STATE_DIR}/layout.json`, layout); }); }
   saveEdit(body:Record<string,unknown>){return this.mutate(async()=>{
     const workspace=await this.snapshot();
-    if(!workspace.experiment.frames.some(frame=>frame.id===body.frameId))throw new RequestError('Frame não encontrado.',404);
+    const frame=workspace.experiment.frames.find(candidate=>candidate.id===body.frameId);
+    if(!frame)throw new RequestError('Frame não encontrado.',404);
     const edit=validateEdit({...body,styles:body.styles??{}});
-    const previous=workspace.edits?.find(previous=>previous.frameId===edit.frameId&&previous.selector===edit.selector);
-    const edits=(workspace.edits??[]).filter(previous=>previous.frameId!==edit.frameId||previous.selector!==edit.selector);
-    if(body.remove!==true)edits.push({...previous,...edit,styles:{...previous?.styles,...edit.styles}});
-    await this.stateDirectory();await this.atomic('.draftroom/edits.json',edits);
+    const key=this.baselineKey(edit.frameId,edit.selector);
+    const baselines=await this.loadBaselines();
+    if(body.remove===true){
+      const baseline=baselines[key];
+      if(!baseline)throw new RequestError('Nenhum ajuste salvo para restaurar.',404);
+      await revertBaseline(this.root,baseline);
+      delete baselines[key];
+      await this.saveBaselines(baselines);
+      return;
+    }
+    if(!baselines[key])baselines[key]=await captureBaseline(this.root,frame,edit.selector);
+    await applyEdit(this.root,frame,edit);
+    await this.saveBaselines(baselines);
   });}
   feedback(body: Record<string, unknown>, id?: string) { return this.mutate(async () => {
     const workspace = await this.snapshot(); const previous = workspace.feedback.find(feedback => feedback.id === id);
@@ -146,7 +189,7 @@ export class WorkspaceStore {
     if (id && !['open', 'resolved'].includes(String(body.status))) throw new RequestError('Estado inválido.');
     if (!previous && (typeof body.frameId !== 'string' || !workspace.experiment.frames.some(frame => frame.id === body.frameId) || typeof body.message !== 'string' || !body.message.trim() || body.message.length > 10000)) throw new RequestError('Comentário inválido.');
     const event: Feedback = previous ? { ...previous, status: body.status === 'resolved' ? 'resolved' : 'open', event: body.status === 'resolved' ? 'resolved' : 'reopened', eventId: randomUUID() } : { id: randomUUID(), eventId: randomUUID(), event: 'created', status: 'open', frameId: String(body.frameId), message: String(body.message).trim(), target: validateTarget(body.target), createdAt: new Date().toISOString() };
-    const directory = await this.stateDirectory(); try { await confined(this.root, '.draftroom/feedback.jsonl'); if ((await lstat(path.join(directory, 'feedback.jsonl'))).isSymbolicLink()) throw new RequestError('O arquivo de feedback não pode ser um symlink.', 403); } catch (error) { if (error instanceof RequestError) throw error; } await appendFile(path.join(directory, 'feedback.jsonl'), `${JSON.stringify(event)}\n`);
+    const directory = await this.stateDirectory(); try { await confined(this.root, `${STATE_DIR}/feedback.jsonl`); if ((await lstat(path.join(directory, 'feedback.jsonl'))).isSymbolicLink()) throw new RequestError('O arquivo de feedback não pode ser um symlink.', 403); } catch (error) { if (error instanceof RequestError) throw error; } await appendFile(path.join(directory, 'feedback.jsonl'), `${JSON.stringify(event)}\n`);
   }); }
   changeFrame(id: string, action: string, body: Record<string, unknown>) { return this.mutate(async () => {
     const raw: unknown = JSON.parse(await readFile(await confined(this.root, 'experiment.json'), 'utf8')); const experiment = parseExperiment(raw); let addedFrameId: string | undefined; const frame = experiment.frames.find(frame => frame.id === id); if (!frame) throw new RequestError('Frame não encontrado.', 404);

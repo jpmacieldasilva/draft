@@ -14,12 +14,12 @@ The working directory contains `experiment.json` (or a root `index.html`) and is
 1. Confirm this is a workspace — look for `experiment.json` or `frames/`.
 2. Do not modify workspace files unless the user explicitly asks.
 3. Find a runtime:
-   - `protofield` on PATH
-   - `node_modules/.bin/protofield` in a Draft checkout
+   - `draft` on PATH
+   - `node_modules/.bin/draft` in a Draft checkout
    - `node <draft-repo>/dist/runtime/cli.js` after `npm run build` in that repo
-   - `protofield-*.tgz` installed offline
-4. Run `protofield inspect .` when available.
-5. Run `protofield open .` and report the URL (default `http://127.0.0.1:4173`).
+   - `draft-viewer-*.tgz` installed offline
+4. Run `draft inspect .` when available.
+5. Run `draft open .` and report the URL (default `http://127.0.0.1:4173`).
 6. Keep the server process running until the user stops it.
 
 ## If runtime is missing

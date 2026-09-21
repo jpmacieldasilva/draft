@@ -12,7 +12,7 @@ Open a prototype, filter the library, and save a text. In the focus alternative,
 
 ## Leave an intention
 
-Use **Inspect** to point at an element, or **Region** to comment on an area. Feedback lives in `.draftroom/feedback.jsonl` next to the prototypes.
+Use **Inspect** to point at an element, or **Region** to comment on an area. Feedback lives in `.draft/feedback.jsonl` next to the prototypes.
 
 ## Open this workspace
 
