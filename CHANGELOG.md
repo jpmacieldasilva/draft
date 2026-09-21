@@ -8,6 +8,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- Root Cursor skill `use-draft` and README agent contract: any request to use Draft triggers clone-once, build-once, open `examples/studio` or project `canvas/`.
 - Public repository with MIT license and community docs.
 - Workspace agent contract (`examples/studio/AGENTS.md`) and Cursor start skill.
 - English README focused on folder-first workflow.

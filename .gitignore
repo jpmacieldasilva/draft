@@ -8,7 +8,10 @@ test-results/
 playwright-report/
 .DS_Store
 .env*
-/.cursor/
+/.cursor/*
+!/.cursor/skills/
+!/.cursor/skills/use-draft/
+!/.cursor/skills/use-draft/**
 
 # Internal construction docs (not for the public repo)
 /README.local.md
