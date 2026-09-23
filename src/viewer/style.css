@@ -15,3 +15,45 @@ button svg,summary svg{width:18px;height:18px;stroke-width:1.7;flex:none}.toolba
 .add-frame{display:flex;align-items:center;gap:7px;padding:8px 11px;border:1px solid #d5dbe3;border-radius:8px;background:#fafbfc;font-size:12px}.add-frame:hover{background:#e6ebf1}.create-sheet{max-width:520px;padding:40px}.create-sheet h1{margin-bottom:14px}.create-copy{color:#657183;line-height:1.7;margin:0 0 24px}.create-form{display:grid;gap:20px}.create-actions{display:flex;justify-content:flex-end;gap:8px}.create-actions button{padding:10px 13px;border-radius:8px}.create-actions button:first-child{border:1px solid #d5dbe3}
 
 .visual-editor{padding:14px 16px;gap:12px;background:#fcfcfd}.editor-header{display:flex;align-items:center;gap:9px;min-width:0}.editor-header>div{display:grid;gap:2px;min-width:0}.editor-header strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600;color:#25334a}.editor-eyebrow{font-size:10px;line-height:1;text-transform:uppercase;letter-spacing:.08em;color:#7a8494}.selection-indicator{width:8px;height:8px;flex:none;border-radius:50%;background:#4169e1;box-shadow:0 0 0 3px #e6ecff}.editor-loading{font-size:12px;color:#657183}.editor-text{gap:6px}.editor-fields{gap:10px 8px}.editor-group{padding-top:9px}.editor-group>summary{padding:2px 0 9px;color:#25334a}.editor-group[open]>summary{color:#4169e1}.editor-actions{order:5}.visual-editor .restore-original{order:6}.visual-editor [role=alert]{font-size:12px;color:#a53d3d}.visual-editor [role=status]{font-size:11px}
+
+
+/* Agent presence: soft pulse ring + pill (no avatars) */
+.frame.agent-active .frame-content {
+  outline: 2px solid #6b8cff;
+  outline-offset: 4px;
+  animation: agent-pulse 2.4s ease-in-out infinite;
+}
+@keyframes agent-pulse {
+  0%, 100% { outline-color: #6b8cff88; box-shadow: 0 0 0 0 #6b8cff00; }
+  50% { outline-color: #6b8cff; box-shadow: 0 0 0 6px #6b8cff18; }
+}
+.agent-pill {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #3b4f8a;
+  background: #e8eefc;
+  border: 1px solid #c5d2f5;
+  border-radius: 999px;
+  padding: 3px 8px;
+  line-height: 1;
+}
+.visual-editor.agent-locked {
+  background: #f7f8fb;
+}
+.selection-indicator.locked {
+  background: #8a94a8;
+  box-shadow: 0 0 0 3px #e6e9ef;
+}
+.editor-lock {
+  margin: 0;
+  padding: 4px 0 8px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #5a6578;
+}
+@media (prefers-reduced-motion: reduce) {
+  .frame.agent-active .frame-content { animation: none; }
+}

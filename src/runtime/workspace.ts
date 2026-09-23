@@ -1,7 +1,7 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { readFile, realpath, mkdir, writeFile, rename, appendFile, cp, access, lstat, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import type { Experiment, Frame, Feedback, Layout, Target, Workspace, VisualEdit, Connection } from '../protocol.js';
+import type { Experiment, Frame, Feedback, Layout, Target, Workspace, VisualEdit, Connection, PresenceActor, PresenceState } from '../protocol.js';
 import { applyEdit, captureBaseline, revertBaseline, type EditBaseline } from './prototype-writer.js';
 
 export class RequestError extends Error { constructor(message: string, public status = 400) { super(message); } }
@@ -158,7 +158,8 @@ export class WorkspaceStore {
     for (const line of (await readStateFile(this.root, 'feedback.jsonl')).split('\n').filter(Boolean)) {
       try { const event: unknown = JSON.parse(line); if (record(event) && typeof event.id === 'string' && typeof event.frameId === 'string' && typeof event.message === 'string' && typeof event.createdAt === 'string' && typeof event.eventId === 'string') feedback.set(event.id, { event: event.event === 'resolved' ? 'resolved' : event.event === 'reopened' ? 'reopened' : 'created', id: event.id, eventId: event.eventId, frameId: event.frameId, message: event.message, createdAt: event.createdAt, status: event.status === 'resolved' ? 'resolved' : 'open', target: validateTarget(event.target) }); } catch { diagnostics.push('Uma linha inválida de feedback foi ignorada.'); }
     }
-    return { experiment, readme: await optionalText(this.root, 'README.md'), feedback: [...feedback.values()], layout, revision: createHash('sha256').update(layoutText).digest('hex'), token: this.token, readOnly: false, diagnostics };
+    const presence = (await this.loadPresence()).actors;
+    return { experiment, readme: await optionalText(this.root, 'README.md'), feedback: [...feedback.values()], layout, revision: createHash('sha256').update(layoutText).digest('hex'), token: this.token, readOnly: false, diagnostics, presence };
   }
   private async stateDirectory() { const directory = path.join(this.root, STATE_DIR); await mkdir(directory, { recursive: true }); if ((await lstat(directory)).isSymbolicLink()) throw new RequestError('A pasta de estado não pode ser um symlink.', 403); return confined(this.root, STATE_DIR); }
   private async atomic(relative: string, value: unknown) { const directory = await confined(this.root, path.dirname(relative)); const destination = path.join(directory, path.basename(relative)); try { await confined(this.root, relative); } catch (error) { if (error instanceof RequestError) throw error; } const temporary = `${destination}.${randomUUID()}.tmp`; await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { flag: 'wx' }); await rename(temporary, destination); }
@@ -168,6 +169,8 @@ export class WorkspaceStore {
     const workspace=await this.snapshot();
     const frame=workspace.experiment.frames.find(candidate=>candidate.id===body.frameId);
     if(!frame)throw new RequestError('Frame não encontrado.',404);
+    const claim = (await this.loadPresence()).actors.find(actor => actor.frameId === frame.id);
+    if (claim) throw new RequestError(`Agent está neste frame (${claim.label}). Aguarde o claim expirar ou ser liberado.`, 409);
     const edit=validateEdit({...body,styles:body.styles??{}});
     const key=this.baselineKey(edit.frameId,edit.selector);
     const baselines=await this.loadBaselines();
@@ -223,4 +226,140 @@ export class WorkspaceStore {
     experiment.frames.push({ id: frameId, title: trimmedTitle, entry, viewport: { width: 390, height: 844 } });
     await this.atomic('experiment.json', { ...(record(raw) ? raw : {}), frames: experiment.frames });
   }); }
+  private async resolvePresenceDirectory(): Promise<string> {
+    try {
+      const s = await lstat(path.join(this.root, `${STATE_DIR}/presence.json`));
+      if (s.isFile()) return STATE_DIR;
+    } catch {}
+    try {
+      const s = await lstat(path.join(this.root, `${LEGACY_STATE_DIR}/presence.json`));
+      if (s.isFile()) return LEGACY_STATE_DIR;
+    } catch {}
+    try {
+      const s = await lstat(path.join(this.root, STATE_DIR));
+      if (s.isDirectory() && !s.isSymbolicLink()) return STATE_DIR;
+    } catch {}
+    try {
+      const s = await lstat(path.join(this.root, LEGACY_STATE_DIR));
+      if (s.isDirectory() && !s.isSymbolicLink()) return LEGACY_STATE_DIR;
+    } catch {}
+    return LEGACY_STATE_DIR;
+  }
+  async loadPresence(includeExpired = false): Promise<PresenceState> {
+    const source = await readStateFile(this.root, 'presence.json');
+    if (!source) return { actors: [] };
+    try {
+      const parsed: unknown = JSON.parse(source);
+      if (!record(parsed) || !Array.isArray(parsed.actors)) return { actors: [] };
+      const now = Date.now();
+      const actors: PresenceActor[] = [];
+      for (const item of parsed.actors) {
+        if (!record(item) || typeof item.id !== 'string' || !item.id.trim()) continue;
+        const label = typeof item.label === 'string' && item.label.trim() ? item.label.trim() : 'Agent';
+        const frameId = typeof item.frameId === 'string' && item.frameId.trim() ? item.frameId.trim() : (item.frameId === null ? null : undefined);
+        const since = typeof item.since === 'string' && !isNaN(Date.parse(item.since)) ? item.since : new Date().toISOString();
+        const expiresAt = typeof item.expiresAt === 'string' && !isNaN(Date.parse(item.expiresAt)) ? item.expiresAt : new Date(now + 120000).toISOString();
+        const expiresTime = Date.parse(expiresAt);
+        if (!includeExpired && (!Number.isFinite(expiresTime) || expiresTime <= now)) continue;
+        actors.push({
+          id: item.id.trim(),
+          label,
+          ...(frameId !== undefined ? { frameId } : {}),
+          since,
+          expiresAt,
+        });
+      }
+      return { actors };
+    } catch {
+      return { actors: [] };
+    }
+  }
+  async savePresence(state: PresenceState): Promise<void> {
+    const dir = await this.resolvePresenceDirectory();
+    const directory = path.join(this.root, dir);
+    await mkdir(directory, { recursive: true });
+    if ((await lstat(directory)).isSymbolicLink()) throw new RequestError('A pasta de estado não pode ser um symlink.', 403);
+    await confined(this.root, dir);
+    await this.atomic(`${dir}/presence.json`, state);
+  }
+  private mutatePresence(operation: (current: PresenceState) => Promise<PresenceState> | PresenceState): Promise<PresenceState> {
+    const result = this.queue.then(async () => {
+      this.root = await realpath(this.root);
+      const current = await this.loadPresence(true);
+      const updated = await operation(current);
+      const now = Date.now();
+      const prunedActors = updated.actors.filter(actor => {
+        const exp = Date.parse(actor.expiresAt);
+        return Number.isFinite(exp) && exp > now;
+      });
+      const nextState: PresenceState = { actors: prunedActors };
+      await this.savePresence(nextState);
+      return nextState;
+    });
+    this.queue = result.catch(() => {});
+    return result;
+  }
+  async claim(options: { id?: string; label?: string; frameId?: string | null; ttlSeconds?: number } = {}): Promise<{ actor: PresenceActor; state: PresenceState }> {
+    const discovery = await discoverExperiment(this.root);
+    let frameId: string | null = null;
+    if (options.frameId) {
+      const trimmed = options.frameId.trim();
+      const frame = discovery.experiment.frames.find(f => f.id === trimmed);
+      if (!frame) throw new RequestError('Frame não encontrado.', 404);
+      frameId = trimmed;
+    }
+    const id = options.id?.trim() || randomUUID();
+    const label = options.label?.trim() || 'Agent';
+    const ttl = (typeof options.ttlSeconds === 'number' && Number.isFinite(options.ttlSeconds) && options.ttlSeconds > 0) ? Math.min(86400, Math.round(options.ttlSeconds)) : 120;
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + ttl * 1000).toISOString();
+    let claimedActor: PresenceActor | undefined;
+
+    const state = await this.mutatePresence((current) => {
+      const nowTime = now.getTime();
+      const active = current.actors.filter(a => {
+        const exp = Date.parse(a.expiresAt);
+        return Number.isFinite(exp) && exp > nowTime;
+      });
+      const index = active.findIndex(a => a.id === id);
+      if (index >= 0) {
+        claimedActor = {
+          ...active[index],
+          label,
+          frameId,
+          expiresAt,
+        };
+        active[index] = claimedActor;
+      } else {
+        claimedActor = {
+          id,
+          label,
+          frameId,
+          since: now.toISOString(),
+          expiresAt,
+        };
+        active.push(claimedActor);
+      }
+      return { actors: active };
+    });
+
+    return { actor: claimedActor!, state };
+  }
+  async clearPresence(filter?: { id?: string; frameId?: string | null }): Promise<PresenceState> {
+    return this.mutatePresence((current) => {
+      if (!filter || (!filter.id && filter.frameId === undefined)) {
+        return { actors: [] };
+      }
+      const remaining = current.actors.filter(actor => {
+        if (filter.id && actor.id === filter.id) return false;
+        if (filter.frameId !== undefined && (actor.frameId ?? null) === (filter.frameId ?? null)) return false;
+        return true;
+      });
+      return { actors: remaining };
+    });
+  }
+  async pruneExpired(): Promise<PresenceState> {
+    return this.mutatePresence((current) => current);
+  }
 }
+

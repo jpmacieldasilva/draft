@@ -1,4 +1,4 @@
-import type { Feedback, Frame, Layout, Position, Target, Workspace } from '../protocol';
+import type { Feedback, Frame, Layout, Position, PresenceActor, Target, Workspace } from '../protocol';
 declare global { interface Window { __DRAFTROOM__?: Workspace } }
 export type Mode = 'interact' | 'element';
 interface State { workspace?: Workspace; layout: Layout; mode: Mode; selected?: string; presenting?: string; info?: string; target?: {frameId: string; target: Target}; feedback?: string; error?: string; busy: boolean; comments: boolean; newFrame?: boolean }
@@ -113,11 +113,37 @@ function onKey(event:KeyboardEvent) {
  if(event.key==='+' || event.key==='=') zoomBy(1.15);
  if(event.key==='-') zoomBy(1/1.15);
 }
+
+export function activeClaim(frameId?: string | null): PresenceActor | undefined {
+  if (!frameId) return undefined;
+  const now = Date.now();
+  return (state.workspace?.presence ?? []).find(actor => actor.frameId === frameId && Date.parse(actor.expiresAt) > now);
+}
+export function applyPresence(actors: PresenceActor[]) {
+  const workspace = state.workspace;
+  if (!workspace) return;
+  const now = Date.now();
+  const presence = actors.filter(actor => Date.parse(actor.expiresAt) > now);
+  update({ workspace: { ...workspace, presence } });
+}
+
 export function activeFeedback(): Feedback[] { return state.workspace?.feedback ?? []; }
 export async function initialize() {
  window.addEventListener('message',onMessage); window.addEventListener('hashchange',readRoute); window.addEventListener('keydown',onKey);
  if(window.__DRAFTROOM__) { acceptWorkspace(window.__DRAFTROOM__,true); return; }
  await refresh();
  const events = new EventSource('./api/events');
- events.onmessage = event => { try { const payload: {type:string;frameIds?:string[]} = JSON.parse(event.data); if(payload.type==='reload') payload.frameIds?.forEach(id => { const iframe=iframes.get(id); if(iframe) { const url=new URL(iframe.src); url.searchParams.set('_reload',String(Date.now())); iframe.src=url.href; } }); if(payload.type==='workspace') void refresh(); } catch { /* Ignore malformed stream messages. */ } };
+ events.onmessage = event => { try {
+  const payload: {type:string;frameIds?:string[];actors?:PresenceActor[]} = JSON.parse(event.data);
+  if(payload.type==='reload') payload.frameIds?.forEach(id => { const iframe=iframes.get(id); if(iframe) { const url=new URL(iframe.src); url.searchParams.set('_reload',String(Date.now())); iframe.src=url.href; } });
+  if(payload.type==='workspace') void refresh();
+  if(payload.type==='presence' && Array.isArray(payload.actors)) applyPresence(payload.actors);
+ } catch { /* Ignore malformed stream messages. */ } };
+ setInterval(() => {
+  const workspace = state.workspace;
+  if (!workspace?.presence?.length) return;
+  const now = Date.now();
+  const presence = workspace.presence.filter(actor => Date.parse(actor.expiresAt) > now);
+  if (presence.length !== workspace.presence.length) update({ workspace: { ...workspace, presence } });
+ }, 5000);
 }

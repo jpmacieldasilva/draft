@@ -9,7 +9,7 @@ import '@astryxdesign/core/astryx.css';
 import '@astryxdesign/theme-neutral/theme.css';
 import './style.css';
 import type { Frame, Position } from '../protocol';
-import { subscribe, snapshot, update, initialize, framePosition, iframes, setPosition, saveLayout, setLayout, fit, zoomBy, setMode, present, leavePresentation, syncBridge, selectTarget, mutate, refresh, discardLayoutConflict } from './store';
+import { subscribe, snapshot, update, initialize, framePosition, iframes, setPosition, saveLayout, setLayout, fit, zoomBy, setMode, present, leavePresentation, syncBridge, selectTarget, mutate, refresh, discardLayoutConflict , activeClaim} from './store';
 const PRODUCT_NAME = 'Draft';
 function useStore() { return useSyncExternalStore(subscribe,snapshot); }
 function startMove(event:PointerEvent<HTMLElement>, frame:Frame, resize = false) {
@@ -58,9 +58,12 @@ function NewFrame() {
 function FrameView({frame}:{frame:Frame}) {
  const state=useStore(), position=framePosition(frame), presenting=state.presenting===frame.id;
  const comments=state.workspace?.feedback.filter(comment=>comment.frameId===frame.id) ?? [];
- return <article className={`frame ${presenting?'presenting':''} ${state.selected===frame.id?'selected':''}`} style={{left:position.x,top:position.y,width:position.width,height:position.height+44,display:position.hidden&&!presenting?'none':undefined}} aria-label={frame.title} data-frame-id={frame.id}>
+ const claim = activeClaim(frame.id);
+ return <article className={`frame ${presenting?'presenting':''} ${state.selected===frame.id?'selected':''}${claim?' agent-active':''}`} style={{left:position.x,top:position.y,width:position.width,height:position.height+44,display:position.hidden&&!presenting?'none':undefined}} aria-label={frame.title} data-frame-id={frame.id} title={claim ? 'Agent está neste frame' : undefined}>
   <header className="frame-header" onPointerDown={event=>startMove(event,frame)}>
-   <button className="frame-title" onClick={()=>update({selected:frame.id})}>{frame.title}</button><ViewportControls frame={frame}/>
+   <button className="frame-title" onClick={()=>update({selected:frame.id})}>{frame.title}</button>
+   {claim&&<span className="agent-pill" title="Agent está neste frame">Agent</span>}
+   <ViewportControls frame={frame}/>
    <button className="icon-button" aria-label={`Informações de ${frame.title}`} title="Informações" onClick={()=>update({info:frame.id})}><InfoIcon/></button>
    <button className="icon-button" aria-label={`Apresentar ${frame.title}`} title="Apresentar" onClick={()=>present(frame.id)}><Play/></button>
    {!state.workspace?.readOnly&&<details className="frame-menu"><summary aria-label={`Opções de ${frame.title}`}><MoreHorizontal/></summary><div className="menu">
