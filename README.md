@@ -1,8 +1,41 @@
 # Draft
 
-A portable work surface for HTML prototypes. The **folder is the product** — compare live alternatives on a canvas, point at changes, tweak type and spacing with your hands, and hand the same folder to a person or an agent.
+**Live HTML prototypes on a local canvas.** Compare alternatives side by side, poke the real UI, tweak type and spacing by hand, pin feedback next to the pixels — then hand the same folder to a person or an agent.
 
-No account. No cloud. No proprietary format.
+No account. No cloud. No proprietary format. The **folder is the product**.
+
+![Draft canvas — three live prototypes on one board](media/canvas-v2.png)
+
+## Why it exists
+
+Most “prototype reviews” are screenshots, Figma comments, or a link that dies. Draft keeps **real HTML** in a portable workspace: open it locally, interact with it, leave intentions on the canvas, and share the folder (Git, zip, or a read-only bundle). Agents start the same viewer from the same contract.
+
+## What you can do
+
+| | |
+| --- | --- |
+| **Compare** | Lay out alternatives on a canvas with flow, minimap, and viewport presets. |
+| **Interact** | Click through real HTML/CSS in sandboxed frames — not flat images. |
+| **Inspect** | Override typography, color, and spacing; edits save into the prototype HTML/CSS. |
+| **Comment** | Pin a point or drag a region; feedback lives next to the study. |
+| **Hand off** | Same folder works for a designer, a teammate, or an agent. |
+
+![Inspect mode — edit type and spacing on the live prototype](media/inspector-v2.png)
+
+![Comments — pins and region notes next to the prototype](media/feedback.png)
+
+## Try it in one minute
+
+Requires [Node.js](https://nodejs.org/) 22.12+.
+
+```bash
+git clone https://github.com/jpmacieldasilva/draft.git
+cd draft
+npm ci
+npm run demo
+```
+
+That builds the viewer and opens the included studio study (`examples/studio`). Copy that folder (or create a `canvas/` in your app) when you start your own work — not the whole repository.
 
 ## Use Draft with your agent
 
