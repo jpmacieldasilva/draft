@@ -1,32 +1,33 @@
 # Draft
 
-**Live HTML prototypes on a local canvas.** Compare alternatives side by side, poke the real UI, tweak type and spacing by hand, pin feedback next to the pixels — then hand the same folder to a person or an agent.
+Portable workspace for HTML prototypes. The **folder is the product**: compare live alternatives on a canvas, point at changes, adjust type and spacing, and hand the same folder to a person or an agent.
 
-No account. No cloud. No proprietary format. The **folder is the product**.
+No account. No cloud. No proprietary format.
 
 ![Draft canvas — three live prototypes on one board](media/canvas-v2.png)
 
-## Why it exists
+## Who it’s for
 
-Most “prototype reviews” are screenshots, Figma comments, or a link that dies. Draft keeps **real HTML** in a portable workspace: open it locally, interact with it, leave intentions on the canvas, and share the folder (Git, zip, or a read-only bundle). Agents start the same viewer from the same contract.
+| You | What you need |
+| --- | --- |
+| **Designer** | A folder with `experiment.json` + `frames/`. Ask an agent: *“Start Draft for this folder.”* You do not need this monorepo. |
+| **Agent / developer** | Clone once, `npm ci` + `npm run build`, then `draft open /path/to/workspace`. |
+| **Anyone running the viewer** | [Node.js](https://nodejs.org/) 22.12+. |
 
 ## What you can do
 
 | | |
 | --- | --- |
-| **Compare** | Lay out alternatives on a canvas with flow, minimap, and viewport presets. |
-| **Interact** | Click through real HTML/CSS in sandboxed frames — not flat images. |
-| **Inspect** | Override typography, color, and spacing; edits save into the prototype HTML/CSS. |
-| **Comment** | Pin a point or drag a region; feedback lives next to the study. |
-| **Hand off** | Same folder works for a designer, a teammate, or an agent. |
+| **Compare** | Live HTML alternatives on a local canvas (flow, minimap, viewport presets). |
+| **Inspect** | Tweak type, color, and spacing; edits write into the frame HTML/CSS — the prototype is the source of truth. Layout, pins, and undo live in `.draft/`. |
+| **Comment** | Pin a point or drag a region next to the pixels. |
+| **Share** | Same folder via Git or zip; `draft export` makes a read-only bundle. |
 
 ![Inspect mode — edit type and spacing on the live prototype](media/inspector-v2.png)
 
 ![Comments — pins and region notes next to the prototype](media/feedback.png)
 
 ## Try it in one minute
-
-Requires [Node.js](https://nodejs.org/) 22.12+.
 
 ```bash
 git clone https://github.com/jpmacieldasilva/draft.git
@@ -35,11 +36,11 @@ npm ci
 npm run demo
 ```
 
-That builds the viewer and opens the included studio study (`examples/studio`). Copy that folder (or create a `canvas/` in your app) when you start your own work — not the whole repository.
+Opens the included studio study (`examples/studio`). Copy that folder when you start your own work — not the whole repository.
 
 ## Use Draft with your agent
 
-There is no magic phrase. When the user wants to **use Draft** — start the viewer, open the canvas, prepare screens — follow the steps below. Examples: *"inicie"*, *"comece"*, *"open Draft"*, *"start the canvas"*.
+There is no magic phrase. When the user wants to **use Draft** — start the viewer, open the canvas, prepare screens — follow the steps below. Examples: *"inicie"*, *"comece"*, *"Start Draft for this folder"*, *"open Draft"*.
 
 **Requires Node.js 22.12+** on the machine that runs the viewer.
 
@@ -85,10 +86,6 @@ draft inspect /path/to/workspace
 draft export /path/to/study /path/to/bundle
 ```
 
-## Contributing
-
-→ [CONTRIBUTING.md](CONTRIBUTING.md)
-
 ## Portable workspace
 
 ```json
@@ -106,12 +103,22 @@ draft export /path/to/study /path/to/bundle
 }
 ```
 
+Save as `experiment.json` next to `frames/`.
+
 ## Limits
 
 - Classic HTML, CSS, and local scripts in sandboxed iframes (`allow-scripts` only).
 - No guaranteed support for modules, iframe storage, or network APIs.
-- Visual pins record geometry at comment time; they do not follow scroll or DOM changes automatically.
-- Inspector edits are written into `frames/` HTML or linked CSS — the prototype is the source of truth. Stable selectors (`data-draftroom-id`, `id`) work best.
+- Visual pins are geometric at comment time; they do not follow scroll or DOM changes automatically.
+- Prefer stable selectors (`data-draftroom-id`, `id`).
 - Read-only bundles do not persist remote feedback.
+
+## Out of scope
+
+Draft stays a **local folder**. It is not a cloud product, not a vector design app, not an image-gen workbench, and not a proprietary chat canvas. HTML in `frames/` remains the source of truth.
+
+## Contributing
+
+→ [CONTRIBUTING.md](CONTRIBUTING.md)
 
 MIT License. UI built with [Astryx](https://astryxdesign.com/).
