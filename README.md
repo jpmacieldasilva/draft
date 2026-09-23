@@ -30,7 +30,7 @@ Opens the included studio study (`examples/studio`). Copy that folder when you s
 - **Comment** — pin a point or drag a region next to the pixels.
 - **Share** — same folder via Git or zip; `draft export` builds a read-only bundle.
 
-Durable workspace state (layout, pins, undo) lives in **`.draftroom/`** (the viewer may also write `.draft/` on newer runs — both are local metadata next to your study, not the product UI).
+Local state in `.draftroom/`.
 
 Frame HTML/CSS under `frames/` is what you ship and hand off. Edit those files (or verify them after Inspect) when you need something to survive reload.
 
