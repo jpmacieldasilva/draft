@@ -1,6 +1,6 @@
 import {useEffect, useState, type Dispatch, type SetStateAction, type ChangeEvent} from 'react';
 import type {Target} from '../protocol';
-import {iframes, mutate, snapshot} from './store';
+import {activeClaim, iframes, mutate, snapshot} from './store';
 
 type Styles = Record<string,string>;
 interface EditorState {styles:Styles; changes:Styles; text?:string; changedText?:string; editableText:boolean; ready:boolean; error?:string; saved:boolean}
@@ -50,9 +50,16 @@ async function restoreOriginal(context:EditorContext) {
 function numericValue(value?:string) {if(!value||!/^[-\d.]+px$/.test(value))return '';return parseFloat(value);}
 export function VisualEditor({frameId,target}:{frameId:string;target:Target}) {
  const [state,setState]=useState<EditorState>(EMPTY_STATE);
- useEffect(()=>subscribeStyles(frameId,target,setState),[frameId,target.selector]);
+ const claim = activeClaim(frameId);
+ useEffect(()=>{ if (claim) return; return subscribeStyles(frameId,target,setState); },[frameId,target.selector,claim?.id]);
  const context={frameId,target,state,setState};
  if(target.kind!=='element')return null;
+ if (claim) {
+  return <section className="visual-editor agent-locked" aria-label="Inspect bloqueado">
+   <header className="editor-header"><span className="selection-indicator locked" aria-hidden="true"/><div><span className="editor-eyebrow">Agent</span><strong>{claim.label}</strong></div></header>
+   <p className="editor-lock" role="status" title="Agent está neste frame">Agent está neste frame. Inspect desabilitado até o claim expirar ou ser liberado.</p>
+  </section>;
+ }
  return <section className="visual-editor" aria-label="Editar elemento">
   <header className="editor-header"><span className="selection-indicator" aria-hidden="true"/><div><span className="editor-eyebrow">Selecionado</span><strong>{target.label}</strong></div></header>
   {!state.ready&&<p className="editor-loading" role="status">Lendo propriedades do elemento…</p>}

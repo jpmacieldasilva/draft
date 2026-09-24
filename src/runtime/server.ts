@@ -35,10 +35,35 @@ export async function startRuntime(folder: string, port = 4173) {
       if (pathname.startsWith('/api/')) {
         if (request.headers.origin && request.headers.origin !== viewerOrigin) throw new RequestError('Origem inválida.', 403);
         if (request.method === 'GET' && pathname === '/api/workspace') return send(response, 200, await store.snapshot());
+        if (request.method === 'GET' && pathname === '/api/presence') return send(response, 200, await store.loadPresence());
         if (request.method === 'GET' && pathname === '/api/events') { response.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' }); response.write(': connected\n\n'); clients.add(response); request.on('close', () => clients.delete(response)); return; }
-        if (request.method !== 'POST') throw new RequestError('Rota não encontrada.', 404);
+        if (!['POST', 'DELETE'].includes(request.method || '')) throw new RequestError('Rota não encontrada.', 404);
         const token = request.headers['x-draft-token'] ?? request.headers['x-draftroom-token'];
-        if (token !== store.token || request.headers.origin !== viewerOrigin) throw new RequestError('Escrita não autorizada.', 403);
+        if (token !== store.token || (request.headers.origin && request.headers.origin !== viewerOrigin)) throw new RequestError('Escrita não autorizada.', 403);
+        if (pathname === '/api/presence') {
+          if (request.method === 'POST') {
+            const payload = await body(request);
+            const actorHeader = (request.headers['x-actor-id'] ?? request.headers['x-draft-actor-id'] ?? request.headers['actor-id']) as string | undefined;
+            const actorId = actorHeader || (typeof payload.id === 'string' ? payload.id : undefined);
+            const frameId = payload.frameId !== undefined ? (payload.frameId === null ? null : String(payload.frameId)) : undefined;
+            const label = typeof payload.label === 'string' ? payload.label : undefined;
+            const ttlSeconds = typeof payload.ttlSeconds === 'number' ? payload.ttlSeconds : undefined;
+            const claimResult = await store.claim({ id: actorId, frameId, label, ttlSeconds });
+            broadcast({ type: 'presence', actors: claimResult.state.actors });
+            return send(response, 200, { ...claimResult.actor, actor: claimResult.actor, actors: claimResult.state.actors });
+          }
+          if (request.method === 'DELETE') {
+            const payload: Record<string, unknown> = await body(request).catch(() => ({}));
+            const parsedUrl = new URL(request.url || '/', viewerOrigin);
+            const queryId = parsedUrl.searchParams.get('id');
+            const actorHeader = (request.headers['x-actor-id'] ?? request.headers['x-draft-actor-id'] ?? request.headers['actor-id']) as string | undefined;
+            const id = (typeof payload.id === 'string' ? payload.id : (queryId || actorHeader)) || undefined;
+            const state = await store.clearPresence(id ? { id } : undefined);
+            broadcast({ type: 'presence', actors: state.actors });
+            return send(response, 200, { cleared: true, actors: state.actors });
+          }
+        }
+        if (request.method !== 'POST') throw new RequestError('Rota não encontrada.', 404);
         const payload = await body(request); let workspace;
         if (pathname === '/api/layout') workspace = await store.saveLayout(payload);
         else if (pathname === '/api/edits') workspace = await store.saveEdit(payload);
@@ -62,6 +87,11 @@ export async function startRuntime(folder: string, port = 4173) {
     const frameIds = workspace.experiment.frames.filter(frame => files.some(file => file === frame.entry || file.startsWith(`${path.dirname(frame.entry)}/`) || !workspace.experiment.frames.some(candidate => file.startsWith(`${path.dirname(candidate.entry)}/`)))).map(frame => frame.id);
     if (frameIds.length) broadcast({ type: 'reload', frameIds });
     if (files.some(file => file === 'experiment.json' || file.endsWith('README.md') || file.startsWith('.draftroom') || file.startsWith('.draft'))) broadcast({ type: 'workspace' });
+    if (files.some(file => file.endsWith('presence.json'))) {
+      const presence = await store.loadPresence();
+      broadcast({ type: 'presence', actors: presence.actors });
+    }
   }, 120); });
+
   return { store, url: viewerOrigin, contentUrl: contentOrigin, close: async () => { clearTimeout(timer); watcher.close(); for (const client of clients) client.end(); await Promise.all([viewer, content].map(server => new Promise<void>(resolve => server.close(() => resolve())))); } };
 }

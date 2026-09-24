@@ -8,5 +8,8 @@ export interface Position extends Viewport { x: number; y: number; hidden?: bool
 export interface Connection { id: string; from: string; to: string; label: string }
 export interface VisualEdit { id: string; frameId: string; selector: string; styles: Record<string,string>; text?: string }
 export interface Layout { frames: Record<string, Position>; zoom: number; x: number; y: number; connections?: Connection[] }
-export interface Workspace { experiment: Experiment; readme: string; feedback: Feedback[]; layout: Layout | null; revision: string; token: string; readOnly: boolean; diagnostics: string[]; edits?: VisualEdit[] }
+export interface PresenceActor { id: string; label: string; frameId?: string | null; since: string; expiresAt: string }
+export interface PresenceState { actors: PresenceActor[] }
+export interface Workspace { experiment: Experiment; readme: string; feedback: Feedback[]; layout: Layout | null; revision: string; token: string; readOnly: boolean; diagnostics: string[]; edits?: VisualEdit[]; presence?: PresenceActor[] }
 export interface BridgeSelection { type: 'draftroom:selection'; target: Target }
+

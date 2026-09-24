@@ -43,3 +43,13 @@ The user wants to **use Draft**: run the viewer, open the canvas, preview or exp
 - Classic HTML/CSS/JS in sandboxed iframes; modules and storage APIs are not guaranteed.
 - Read-only export bundles cannot persist feedback.
 - `canvas/` in an app is for prototypes only; it does not generate app code.
+
+## Agent presence (when editing frames)
+
+If you will change files under `frames/`, claim first so Inspect soft-locks for humans:
+
+`draft presence claim <workspace> <frameId> --label Agent --ttl 120`
+
+Clear when done: `draft presence clear <workspace> <frameId>`.
+
+Local metadata lives in `.draftroom/` (layout, feedback, presence). Inspect persistence requires **Salvar ajuste** in the viewer — exploration alone does not rewrite HTML.

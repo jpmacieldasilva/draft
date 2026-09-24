@@ -43,3 +43,44 @@ details[open]>.menu,details[open]>.viewport-panel{animation:menu-enter var(--mot
 .is-presenting .side-panel{top:20px}
 @media(max-width:900px){.side-panel{right:10px;width:min(340px,calc(100vw - 20px))}}
 @media (prefers-reduced-motion: reduce) {.side-panel,.scrim,.info-sheet,details[open]>.menu,details[open]>.viewport-panel{animation:none}}
+
+/* Agent presence: soft pulse ring + pill (no avatars) */
+.frame.agent-active .frame-content {
+  outline: 2px solid #6b8cff;
+  outline-offset: 4px;
+  animation: agent-pulse 2.4s ease-in-out infinite;
+}
+@keyframes agent-pulse {
+  0%, 100% { outline-color: #6b8cff88; box-shadow: 0 0 0 0 #6b8cff00; }
+  50% { outline-color: #6b8cff; box-shadow: 0 0 0 6px #6b8cff18; }
+}
+.agent-pill {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #3b4f8a;
+  background: #e8eefc;
+  border: 1px solid #c5d2f5;
+  border-radius: 999px;
+  padding: 3px 8px;
+  line-height: 1;
+}
+.visual-editor.agent-locked {
+  background: #f7f8fb;
+}
+.selection-indicator.locked {
+  background: #8a94a8;
+  box-shadow: 0 0 0 3px #e6e9ef;
+}
+.editor-lock {
+  margin: 0;
+  padding: 4px 0 8px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #5a6578;
+}
+@media (prefers-reduced-motion: reduce) {
+  .frame.agent-active .frame-content { animation: none; }
+}
