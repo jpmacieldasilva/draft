@@ -1,13 +1,13 @@
 import type { Feedback, Frame, Layout, Position, Target, Workspace } from '../protocol';
 declare global { interface Window { __DRAFTROOM__?: Workspace } }
-export type Mode = 'interact' | 'element';
-interface State { workspace?: Workspace; layout: Layout; mode: Mode; selected?: string; presenting?: string; info?: string; target?: {frameId: string; target: Target}; feedback?: string; error?: string; busy: boolean; comments: boolean; newFrame?: boolean }
+export type Mode = 'interact' | 'element' | 'comment';
+interface State { workspace?: Workspace; layout: Layout; mode: Mode; selected?: string; presenting?: string; info?: string; target?: {frameId: string; target: Target}; feedback?: string; error?: string; busy: boolean; comments: boolean; inspector: boolean; newFrame?: boolean }
 const listeners = new Set<() => void>();
 let layoutDirty = false;
 let layoutRevision = '';
 let layoutVersion = 0;
 let layoutSaving = false;
-let state: State = { layout: { frames: {}, zoom: .65, x: 80, y: 120 }, mode: 'interact', busy: false, comments: false };
+let state: State = { layout: { frames: {}, zoom: .65, x: 80, y: 120 }, mode: 'interact', busy: false, comments: false, inspector: false };
 export const iframes = new Map<string, HTMLIFrameElement>();
 export function subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 export function snapshot() { return state; }
@@ -87,7 +87,12 @@ export function syncBridge(frameId: string) {
 export function present(frameId: string) { update({presenting:frameId, selected:frameId, info:undefined}); location.hash = `frame/${encodeURIComponent(frameId)}`; }
 export function leavePresentation() { update({presenting:undefined}); history.replaceState(null,'',`${location.pathname}${location.search}`); if(document.fullscreenElement) void document.exitFullscreen(); }
 export function readRoute() { const id = location.hash.startsWith('#frame/') ? decodeURIComponent(location.hash.slice(7)) : undefined; update({presenting:state.workspace?.experiment.frames.some(frame=>frame.id===id) ? id : undefined}); }
-export function selectTarget(frameId:string, target:Target) { update({target:{frameId,target}, selected:frameId, comments:true, feedback:undefined}); }
+export function selectInspectTarget(frameId: string, target: Target) {
+ update({ target: { frameId, target }, selected: frameId, inspector: true, comments: false, feedback: undefined });
+}
+export function selectCommentTarget(frameId: string, target: Target) {
+ update({ target: { frameId, target }, selected: frameId, comments: true, inspector: false, feedback: undefined });
+}
 function isTarget(value: unknown): value is Target {
  if(!value || typeof value !== 'object' || !('kind' in value) || !('rect' in value) || !('label' in value)) return false;
  if(value.kind !== 'element' && value.kind !== 'region' || typeof value.label !== 'string' || value.label.length > 500) return false;
@@ -99,10 +104,14 @@ function onMessage(event:MessageEvent<unknown>) {
  if(!frame || !event.data || typeof event.data !== 'object' || !('type' in event.data)) return;
  if(event.data.type==='draftroom:ready') syncBridge(frame[0]);
  if(event.data.type==='draftroom:escape') { setMode('interact'); leavePresentation(); }
- if(event.data.type==='draftroom:selection' && 'target' in event.data && isTarget(event.data.target) && state.mode==='element') selectTarget(frame[0],event.data.target);
+ if(event.data.type==='draftroom:selection' && 'target' in event.data && isTarget(event.data.target)) {
+  const target = event.data.target;
+  if(state.mode==='element' && target.kind==='element') selectInspectTarget(frame[0], target);
+  if(state.mode==='comment' && target.kind==='region') selectCommentTarget(frame[0], target);
+ }
 }
 function onKey(event:KeyboardEvent) {
- if(event.key==='Escape') { setMode('interact'); update({target:undefined,info:undefined,comments:false}); leavePresentation(); }
+ if(event.key==='Escape') { setMode('interact'); update({target:undefined,info:undefined,comments:false,inspector:false}); leavePresentation(); }
  if(event.target instanceof HTMLElement && event.target.closest('input,textarea,select,[contenteditable],form')) return;
  if(event.key==='0') fit();
  const frame = state.workspace?.experiment.frames.find(frame => frame.id === state.selected);

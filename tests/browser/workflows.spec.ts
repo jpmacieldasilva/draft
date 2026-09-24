@@ -46,10 +46,31 @@ test('preserva interação entre canvas, apresentação e retorno',async({page})
  await page.getByRole('button',{name:'Fechar informações'}).click();
 });
 
-test('persiste comentário de elemento, resolve e reabre na pasta',async({page})=>{
+test('abre inspector ao selecionar elemento sem misturar comentários',async({page})=>{
  await page.goto(url);
  await page.getByRole('button',{name:'Inspecionar',exact:false}).click();
  await page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('heading',{name:'A arte de prestar atenção'}).click();
+ await expect(page.getByRole('complementary',{name:'Inspector'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Salvar ajuste',exact:true})).toBeVisible();
+ await expect(page.getByRole('textbox',{name:'O que precisa mudar?'})).toHaveCount(0);
+});
+
+test('persiste comentário de região, resolve e reabre na pasta',async({page})=>{
+ await page.goto(url);
+ await page.getByRole('button',{name:'Biblioteca editorial',exact:true}).click();
+ await page.getByRole('button',{name:'Centralizar frames',exact:true}).click();
+ await page.getByRole('button',{name:'Comentar',exact:false}).click();
+ await expect(page.getByText(/Arraste no protótipo para marcar uma região/)).toBeVisible();
+ const iframe=page.locator('iframe[title="Biblioteca editorial"]');
+ await expect.poll(async()=>{
+  const region=await iframe.boundingBox();
+  if(!region)return false;
+  await page.mouse.move(region.x+40,region.y+70);
+  await page.mouse.down();
+  await page.mouse.move(region.x+region.width-50,region.y+region.height-60,{steps:15});
+  await page.mouse.up();
+  return page.getByText('Região selecionada').isVisible();
+ },{timeout:15_000}).toBe(true);
  await page.getByRole('textbox',{name:'O que precisa mudar?'}).fill('Dar mais espaço ao título.');
  await page.getByRole('button',{name:'Salvar comentário'}).click();
  await expect(page.getByRole('button',{name:'Resolver',exact:true})).toBeVisible();
@@ -62,7 +83,7 @@ test('persiste comentário de elemento, resolve e reabre na pasta',async({page})
  await expect(page.getByRole('button',{name:'Resolver',exact:true})).toBeVisible();
  const log=await readFile(path.join(stateDir(folder),'feedback.jsonl'),'utf8');
  expect(log.trim().split('\n')).toHaveLength(3);
- expect(log).toContain('featured-title');
+ expect(log).toContain('"kind":"region"');
 });
 
 test('recarrega apenas o frame alterado e preserva outro formulário',async({page})=>{
@@ -119,8 +140,8 @@ test('marca região e persiste comentário',async({page})=>{
  await page.goto(url);
  await page.getByRole('button',{name:'Biblioteca editorial',exact:true}).click();
  await page.getByRole('button',{name:'Centralizar frames',exact:true}).click();
- await page.getByRole('button',{name:'Inspecionar',exact:false}).click();
- await expect(page.getByText(/Arraste para comentar uma região/)).toBeVisible();
+ await page.getByRole('button',{name:'Comentar',exact:false}).click();
+ await expect(page.getByText(/Arraste no protótipo para marcar uma região/)).toBeVisible();
  const iframe=page.locator('iframe[title="Biblioteca editorial"]');
  await expect.poll(async()=>{
   const region=await iframe.boundingBox();
@@ -129,7 +150,7 @@ test('marca região e persiste comentário',async({page})=>{
   await page.mouse.down();
   await page.mouse.move(region.x+region.width-50,region.y+region.height-60,{steps:15});
   await page.mouse.up();
-  return page.getByText('Região selecionado').isVisible();
+  return page.getByText('Região selecionada').isVisible();
  },{timeout:15_000}).toBe(true);
  await expect(page.getByRole('textbox',{name:'O que precisa mudar?'})).toBeVisible();
  await page.getByRole('textbox',{name:'O que precisa mudar?'}).fill('Rever o espaço desta região.');
