@@ -34,7 +34,7 @@ draft presence clear . <frameId>                   # 5. release the frame
 ```
 
 - Do not edit a frame whose `claimedBy` (in `draft context`) is someone else.
-- Allowed in frames: classic HTML, CSS and local scripts. No ES modules and no network: CDNs, remote fonts and remote images are blocked by the viewer's CSP.
+- Allowed in frames: classic HTML, CSS and local scripts. No ES modules and no network: CDNs, remote fonts and remote images are blocked by the viewer's CSP unless the host is listed in `allowNetwork` (e.g. `"allowNetwork": ["fonts.gstatic.com"]`).
 - Put a stable `data-draftroom-id` on elements that receive comments or Inspect tweaks.
 - `draft feedback list . --open` shows what is still pending.
 

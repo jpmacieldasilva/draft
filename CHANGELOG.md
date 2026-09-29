@@ -18,9 +18,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - Titles with `<`, `&` or quotes are escaped in generated HTML.
 - Legacy `.draftroom/` state is migrated into `.draft/` on open; comment logs are merged by event id.
 - Frames reload after atomic writes on Linux (the watcher now maps temporary file names back to the real file).
+- Changes under `.draft/` no longer reload every frame.
 
 ### Added
 
+- Published as `draft-viewer` on npm: `npx draft-viewer open <folder>`. The tarball ships only `dist/`, the studio example and the license.
+- `draft mcp <folder>`: MCP server over stdio with `get_context`, `list_frames`, `get_selection`, `claim`, `release`, `read_frame`, `write_frame`, `resolve_feedback` and `update_manifest`. Writes stay inside `frames/<id>/` and respect other actors' claims.
+- The viewer shares the current Inspect or comment selection in `.draft/selection.json` (`POST /api/selection`) so agents can act on it.
+- English UI: `DRAFT_LANG=en` or `"locale": "en"` in `experiment.json` switches the viewer, the CLI and the agent rules.
+- `allowNetwork` in `experiment.json` opens the frame CSP to specific hosts over HTTPS; invalid entries are ignored with a notice, and frames show which host was blocked.
 - Navigable study: `data-draft-goto="<frameId>"` inside a prototype jumps to that frame while presenting (selects and centers it on the canvas); arrow keys follow `edges` with a back history; the presentation bar lists the next steps. Unknown targets show a notice.
 - `draft export` keeps comments (read-only) and edges; `--no-feedback` leaves comments out.
 - Manifest `schemaVersion: 2`: frame `state`, `role` (control/variant), `group`, `tests`, `signal`; study `decision` (hypothesis, criteria); flow `edges`. Invalid or duplicate edges and multiple controls per group show a diagnostic instead of breaking the viewer.

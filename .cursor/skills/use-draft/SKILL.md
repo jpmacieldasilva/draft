@@ -51,8 +51,10 @@ When the user asks you to change prototypes or act on comments, follow this loop
 
 1. **Read first:** `draft context <workspace>`. It prints the manifest, READMEs, each frame's files, open comments (with frame, selector and message), active claims, and the emission rules. Do not generate HTML before reading it.
 2. **Claim:** `draft presence claim <workspace> <frameId> --label <your name> --ttl 120`. Skip frames whose `claimedBy` is someone else.
-3. **Edit** only files under `frames/<frameId>/`. Classic HTML/CSS and local scripts; no ES modules, no network (CDNs, remote fonts and images are blocked). Add a stable `data-draftroom-id` to elements that get comments or Inspect tweaks.
+3. **Edit** only files under `frames/<frameId>/`. Classic HTML/CSS and local scripts; no ES modules, no network (CDNs, remote fonts and images are blocked unless the host is listed in `allowNetwork` in `experiment.json`). Add a stable `data-draftroom-id` to elements that get comments or Inspect tweaks.
 4. **Resolve** each comment you addressed: `draft feedback resolve <workspace> <id>`. List what is still open with `draft feedback list <workspace> --open`.
 5. **Release:** `draft presence clear <workspace> <frameId>`.
+
+If the client supports MCP, `draft mcp <workspace>` offers the same loop as tools (`get_context`, `get_selection` for what the user has selected in the viewer, `claim`, `write_frame`, `resolve_feedback`, `release`, `update_manifest`).
 
 The open viewer reloads edited frames and updates comments by itself. Local metadata lives in `.draft/` (layout, feedback, presence, undo baselines); never edit it by hand. Inspect writes to the frame's HTML only when the user presses **Salvar ajuste**.

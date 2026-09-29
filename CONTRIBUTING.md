@@ -32,7 +32,7 @@ Headless e2e is fine for CI. For UI changes, also verify in a real browser (canv
 ## What we will not merge (yet)
 
 - Cloud accounts, sync, or real-time collaboration
-- MCP or single-vendor agent plugins
+- Single-vendor agent plugins (the MCP server stays a thin layer over the CLI contract)
 - Full CSS editor / Figma clone scope
 - Breaking the portable folder format without a migration plan
 

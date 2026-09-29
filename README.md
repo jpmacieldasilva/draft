@@ -11,6 +11,13 @@ No account. No cloud. No proprietary format. The **folder is the product**.
 Requires [Node.js](https://nodejs.org/) 22.12+.
 
 ```bash
+npx draft-viewer create my-study "My study"
+npx draft-viewer open my-study
+```
+
+Or run the included studio from a clone:
+
+```bash
 git clone https://github.com/jpmacieldasilva/draft.git
 cd draft
 npm ci
@@ -86,10 +93,24 @@ Everything that matters for the study lives in the manifest, so it travels with 
 - `draft create <folder> "Title" --flow` starts with empty → loading → success / error states already linked.
 - Manifests without `schemaVersion` still open unchanged; the first write from Draft adds `schemaVersion: 2`. Fields Draft does not know are preserved.
 
+### Remote assets (`allowNetwork`)
+
+Frames run under a strict CSP: by default nothing is loaded from the network. When a prototype needs a web font, a CDN image or an API, list the hosts:
+
+```json
+{ "allowNetwork": ["fonts.googleapis.com", "fonts.gstatic.com", "*.example.org"] }
+```
+
+Each entry must be a bare hostname or `*.domain`; it is allowed over `https://` for scripts, styles, images, fonts, media and `fetch`. Anything else (`*`, `http://…`, `data:`, CSP keywords) is ignored with a notice. When a frame tries to load a host that is not listed, the frame shows which host was blocked.
+
+### Language
+
+The viewer, the CLI and the agent rules speak Brazilian Portuguese (default) and English. `DRAFT_LANG=en draft open .` picks English for one person; `"locale": "en"` in `experiment.json` sets it for the study. Validation errors from the runtime stay in Portuguese.
+
 ## Limits
 
 - Classic HTML, CSS, and local scripts in sandboxed iframes (`allow-scripts` only).
-- No guaranteed support for modules, iframe storage, or network APIs.
+- No guaranteed support for modules or iframe storage; network only for hosts in `allowNetwork`.
 - Visual pins are geometric at comment time; they do not follow scroll or DOM changes automatically.
 - Prefer stable selectors (`data-draftroom-id`, `id`).
 - Read-only bundles show comments but cannot create or resolve them.
@@ -107,6 +128,15 @@ draft context /path/to/workspace          # what an agent should read before edi
 draft feedback list /path/to/workspace --open
 draft feedback resolve /path/to/workspace <comment-id>
 draft export /path/to/study /path/to/bundle [--no-feedback]
+draft mcp /path/to/workspace              # MCP server over stdio
+```
+
+### MCP
+
+`draft mcp <folder>` exposes the same contract as the CLI to any MCP client: `get_context`, `list_frames`, `get_selection` (what is selected in the viewer right now), `claim` / `release`, `read_frame` / `write_frame` (only inside `frames/<id>/`, never over another actor's claim), `resolve_feedback` and `update_manifest` (validated; unknown fields preserved).
+
+```json
+{ "mcpServers": { "draft": { "command": "npx", "args": ["-y", "draft-viewer", "mcp", "/path/to/workspace"] } } }
 ```
 
 ## Use Draft with your agent
