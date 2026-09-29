@@ -24,3 +24,5 @@ playwright-report/
 # Demo workspace local state
 examples/**/.draftroom/
 examples/**/.draft/
+
+e2e-evidence/
