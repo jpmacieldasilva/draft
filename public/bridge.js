@@ -101,6 +101,9 @@
     const editable=event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable]');
     if((event.key==='ArrowLeft'||event.key==='ArrowRight')&&!editable&&!event.altKey&&!event.ctrlKey&&!event.metaKey) parent.postMessage({type:'draftroom:key',key:event.key},'*');
   },true);
+  document.addEventListener('securitypolicyviolation',event=>{
+    if(/^https?:/.test(event.blockedURI)) parent.postMessage({type:'draftroom:blocked',uri:event.blockedURI.slice(0,500)},'*');
+  });
   function announceReady() { parent.postMessage({type:'draftroom:ready'},'*'); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',announceReady);
   else announceReady();

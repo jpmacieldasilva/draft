@@ -42,6 +42,21 @@ function parseEdges(value: unknown, frameIds: Set<string>, diagnostics: string[]
   return edges;
 }
 
+const HOST = /^(\*\.)?(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
+/** Only bare hostnames (optionally `*.domain`) are accepted; each becomes `https://host` in the frame CSP. */
+function parseAllowNetwork(value: unknown, diagnostics: string[]): string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) { diagnostics.push('allowNetwork precisa ser uma lista de domínios; ignorado.'); return []; }
+  const hosts: string[] = [];
+  for (const item of value.slice(0, 50)) {
+    const host = typeof item === 'string' ? item.trim().toLowerCase() : '';
+    if (!HOST.test(host)) { diagnostics.push(`allowNetwork: entrada inválida ignorada: ${String(item).slice(0, 120)}`); continue; }
+    if (!hosts.includes(host)) hosts.push(host);
+  }
+  return hosts;
+}
+
 function controlDiagnostics(frames: Frame[], diagnostics: string[]) {
   const controls = new Map<string, string[]>();
   for (const frame of frames) if (frame.role === 'control') controls.set(frame.group ?? 'default', [...(controls.get(frame.group ?? 'default') ?? []), frame.id]);
@@ -60,7 +75,9 @@ export function parseExperiment(value: unknown, diagnostics: string[] = []): Exp
   if (schemaVersion > SCHEMA_VERSION) diagnostics.push(`Manifesto criado por uma versão mais nova do Draft (schemaVersion ${schemaVersion}); campos desconhecidos são preservados.`);
   controlDiagnostics(frames, diagnostics);
   const decision = parseDecision(value.decision);
-  return { schemaVersion, id: typeof value.id === 'string' ? value.id : 'workspace', title: typeof value.title === 'string' ? value.title : 'Draft', frames, edges: parseEdges(value.edges, seen, diagnostics), ...(decision ? { decision } : {}) };
+  const allowNetwork = parseAllowNetwork(value.allowNetwork, diagnostics);
+  const locale = typeof value.locale === 'string' ? value.locale.slice(0, 20) : undefined;
+  return { schemaVersion, id: typeof value.id === 'string' ? value.id : 'workspace', title: typeof value.title === 'string' ? value.title : 'Draft', frames, edges: parseEdges(value.edges, seen, diagnostics), ...(decision ? { decision } : {}), ...(allowNetwork.length ? { allowNetwork } : {}), ...(locale ? { locale } : {}) };
 }
 
 /** Strict: used for writes coming from the viewer or agents. */

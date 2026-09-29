@@ -104,3 +104,4 @@ details[open]>.menu,details[open]>.viewport-panel{animation:menu-enter var(--mot
 .compare-panes iframe{border:1px solid #e3e7ee;border-radius:12px;background:#fff;max-width:100%}
 .presentation-flow{display:flex;gap:6px;align-items:center}
 .presentation-flow button::after{content:" →"}
+.frame-warning { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 3; margin: 0; padding: 8px 12px; border-radius: 8px; background: #fff4e5; color: #7a4100; border: 1px solid #f3c78b; font-size: 12px; line-height: 1.4; pointer-events: none; }

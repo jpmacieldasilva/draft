@@ -3,7 +3,7 @@ import { readFile, stat, realpath } from 'node:fs/promises';
 import { watch } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { WorkspaceStore, confined, publicPath, record, RequestError } from './workspace.js';
+import { WorkspaceStore, confined, publicPath, record, RequestError, discoverExperiment } from './workspace.js';
 
 export const viewerDirectory = fileURLToPath(new URL('../viewer/', import.meta.url));
 const MIME: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ico': 'image/x-icon' };
@@ -11,6 +11,11 @@ function send(response: ServerResponse, status: number, body: unknown) { respons
 async function body(request: IncomingMessage): Promise<Record<string, unknown>> { let text = ''; for await (const chunk of request) { text += String(chunk); if (Buffer.byteLength(text) > 65536) throw new RequestError('Requisição muito grande.', 413); } let value: unknown; try { value = JSON.parse(text || '{}'); } catch { throw new RequestError('JSON inválido.'); } if (!record(value)) throw new RequestError('JSON inválido.'); return value; }
 async function listen(server: Server, port: number) { await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); }); const address = server.address(); if (!address || typeof address === 'string') throw new Error('Porta indisponível.'); return `http://127.0.0.1:${address.port}`; }
 export function injectBridge(html: string, bridgeUrl: string) { return html.replace(/<head([^>]*)>/i, `<head$1><script src="${bridgeUrl}"></script>`) === html ? `<script src="${bridgeUrl}"></script>${html}` : html.replace(/<head([^>]*)>/i, `<head$1><script src="${bridgeUrl}"></script>`); }
+export function frameCsp(contentOrigin: string, viewerOrigin: string, allowNetwork: string[] = []) {
+  const remote = allowNetwork.map(host => ` https://${host}`).join('');
+  return `default-src 'none'; script-src 'unsafe-inline' ${contentOrigin}${remote}; style-src 'unsafe-inline' ${contentOrigin}${remote}; img-src data: blob: ${contentOrigin}${remote}; font-src data: ${contentOrigin}${remote}; media-src ${contentOrigin}${remote}; connect-src ${remote ? remote.trim() : "'none'"}; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${viewerOrigin}`;
+}
+async function allowedHosts(root: string) { try { return (await discoverExperiment(root)).experiment.allowNetwork ?? []; } catch { return []; } }
 export async function startRuntime(folder: string, port = 4173) {
   const store = new WorkspaceStore(folder); await store.initialize(); let viewerOrigin = ''; let contentOrigin = ''; const clients = new Set<ServerResponse>();
   function broadcast(event: unknown) { for (const client of clients) client.write(`data: ${JSON.stringify(event)}\n\n`); }
@@ -23,7 +28,7 @@ export async function startRuntime(folder: string, port = 4173) {
       if (relative !== 'bridge.js' && (!publicPath(relative) || !publicPath(path.relative(store.root, filename)))) throw new RequestError('Arquivo privado.', 403);
       if (!(await stat(filename)).isFile()) throw new RequestError('Arquivo não encontrado.', 404);
       const html = path.extname(filename) === '.html'; const source = await readFile(filename);
-      response.writeHead(200, { 'Content-Type': MIME[path.extname(filename)] || 'application/octet-stream', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': `default-src 'none'; script-src 'unsafe-inline' ${contentOrigin}; style-src 'unsafe-inline' ${contentOrigin}; img-src data: blob: ${contentOrigin}; font-src data: ${contentOrigin}; media-src ${contentOrigin}; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${viewerOrigin}` });
+      response.writeHead(200, { 'Content-Type': MIME[path.extname(filename)] || 'application/octet-stream', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': frameCsp(contentOrigin, viewerOrigin, html ? await allowedHosts(store.root) : []) });
       response.end(request.method === 'HEAD' ? undefined : html ? injectBridge(source.toString(), '/bridge.js') : source);
     } catch (error) { send(response, error instanceof RequestError ? error.status : 404, { error: error instanceof Error ? error.message : 'Arquivo indisponível.' }); }
   });
@@ -65,6 +70,7 @@ export async function startRuntime(folder: string, port = 4173) {
         }
         if (request.method !== 'POST') throw new RequestError('Rota não encontrada.', 404);
         const payload = await body(request); let workspace;
+        if (pathname === '/api/selection') return send(response, 200, await store.saveSelection(payload));
         if (pathname === '/api/layout') workspace = await store.saveLayout(payload);
         else if (pathname === '/api/edits') workspace = await store.saveEdit(payload);
         else if (pathname === '/api/edges') workspace = await store.saveEdges(payload);
@@ -82,10 +88,11 @@ export async function startRuntime(folder: string, port = 4173) {
   });
   try { viewerOrigin = await listen(viewer, port); } catch (error) { content.close(); throw error; }
   let timer: ReturnType<typeof setTimeout> | undefined; const changed = new Set<string>();
-  const watcher = watch(store.root, { recursive: true }, (_event, name) => { if (!name) return; const filename = name.split(path.sep).join('/').replace(/\.[0-9a-f-]{36}\.tmp$/, ''); if (filename.endsWith('.tmp')) return; changed.add(filename); clearTimeout(timer); timer = setTimeout(async () => {
+  const watcher = watch(store.root, { recursive: true }, (_event, name) => { if (!name) return; const filename = name.split(path.sep).join('/').replace(/\.[0-9a-f-]{36}\.tmp$/, ''); if (filename.endsWith('.tmp') || filename.endsWith('selection.json')) return; changed.add(filename); clearTimeout(timer); timer = setTimeout(async () => {
     const files = [...changed]; changed.clear();
     const workspace = await store.snapshot();
-    const frameIds = workspace.experiment.frames.filter(frame => files.some(file => file === frame.entry || file.startsWith(`${path.dirname(frame.entry)}/`) || !workspace.experiment.frames.some(candidate => file.startsWith(`${path.dirname(candidate.entry)}/`)))).map(frame => frame.id);
+    const assets = files.filter(file => !file.startsWith('.draft'));
+    const frameIds = workspace.experiment.frames.filter(frame => assets.some(file => file === frame.entry || file.startsWith(`${path.dirname(frame.entry)}/`) || !workspace.experiment.frames.some(candidate => file.startsWith(`${path.dirname(candidate.entry)}/`)))).map(frame => frame.id);
     if (frameIds.length) broadcast({ type: 'reload', frameIds });
     if (files.some(file => file === 'experiment.json' || file.endsWith('README.md') || file.startsWith('.draftroom') || file.startsWith('.draft'))) broadcast({ type: 'workspace' });
     if (files.some(file => file.endsWith('presence.json'))) {
