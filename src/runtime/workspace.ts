@@ -1,7 +1,8 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { readFile, realpath, mkdir, writeFile, rename, appendFile, cp, access, lstat, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import type { Experiment, Frame, Feedback, Layout, Target, Workspace, VisualEdit, Connection, PresenceActor, PresenceState } from '../protocol.js';
+import { SCHEMA_VERSION, type Experiment, type Frame, type Feedback, type Layout, type Target, type Workspace, type VisualEdit, type Connection, type PresenceActor, type PresenceState } from '../protocol.js';
+import { parseExperiment, serializeManifest, validateEdges } from './manifest.js';
 import { applyEdit, isBaseline, mergeBaseline, revertBaseline, stylesheetsOf, type EditBaseline } from './prototype-writer.js';
 
 export class RequestError extends Error { constructor(message: string, public status = 400) { super(message); } }
@@ -47,17 +48,7 @@ async function migrateLegacyState(root: string) {
   }
 }
 function validViewport(value: unknown): value is Record<string, unknown> & { width: number; height: number } { return record(value) && typeof value.width === 'number' && typeof value.height === 'number' && value.width >= 160 && value.width <= 4000 && value.height >= 120 && value.height <= 4000; }
-function parseExperiment(value: unknown): Experiment {
-  if (!record(value) || !Array.isArray(value.frames)) throw new RequestError('experiment.json precisa conter frames.');
-  const seen = new Set<string>();
-  const frames: Frame[] = value.frames.map((frame: unknown, index: number) => {
-    if (!record(frame) || typeof frame.id !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(frame.id) || seen.has(frame.id)) throw new RequestError(`ID inválido ou repetido no frame ${index + 1}.`);
-    seen.add(frame.id);
-    return { id: frame.id, title: typeof frame.title === 'string' ? frame.title : frame.id, entry: typeof frame.entry === 'string' ? frame.entry : '', viewport: validViewport(frame.viewport) ? frame.viewport : { width: 960, height: 720 } };
-  });
-  return { id: typeof value.id === 'string' ? value.id : 'workspace', title: typeof value.title === 'string' ? value.title : 'Draft', frames };
-}
-export interface WorkspaceDiscovery { experiment: Experiment; generated: boolean }
+export interface WorkspaceDiscovery { experiment: Experiment; generated: boolean; diagnostics: string[] }
 export async function discoverExperiment(root: string): Promise<WorkspaceDiscovery> {
   const resolvedRoot = await realpath(root);
   let manifest: string | undefined;
@@ -70,13 +61,19 @@ export async function discoverExperiment(root: string): Promise<WorkspaceDiscove
   }
   if (manifest) {
     const source = await readFile(manifest, 'utf8');
-    return { experiment: parseExperiment(JSON.parse(source)), generated: false };
+    let raw: unknown;
+    try { raw = JSON.parse(source); } catch { throw new RequestError('experiment.json não é um JSON válido.'); }
+    const diagnostics: string[] = [];
+    return { experiment: parseExperiment(raw, diagnostics), generated: false, diagnostics };
   }
   try {
     await confined(resolvedRoot, 'index.html');
     return {
       generated: true,
+      diagnostics: [],
       experiment: {
+        schemaVersion: SCHEMA_VERSION,
+        edges: [],
         id: path.basename(resolvedRoot).toLowerCase().replace(/[^a-z0-9_-]+/g, '-') || 'workspace',
         title: path.basename(resolvedRoot) || 'Meu espaço',
         frames: [{ id: 'main', title: 'Protótipo principal', entry: 'index.html', viewport: { width: 960, height: 720 } }],
@@ -87,14 +84,38 @@ export async function discoverExperiment(root: string): Promise<WorkspaceDiscove
   }
 }
 export function frameHtml(title: string, body: string) { const safe = escapeHtml(title); return `<!doctype html>\n<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${safe}</title></head><body><main><h1>${safe}</h1><p>${escapeHtml(body)}</p></main></body></html>\n`; }
-export async function createWorkspace(folder: string, title = 'Meu espaço'): Promise<string> {
+const FLOW_STATES = [
+  { id: 'empty', title: 'Vazio', body: 'Nada por aqui ainda.' },
+  { id: 'loading', title: 'Carregando', body: 'Buscando seus dados…' },
+  { id: 'success', title: 'Sucesso', body: 'Tudo certo.' },
+  { id: 'error', title: 'Erro', body: 'Algo deu errado. Tente de novo.' },
+];
+const FLOW_EDGES = [
+  { from: 'empty', to: 'loading', label: 'Buscar' },
+  { from: 'loading', to: 'success', label: 'Deu certo' },
+  { from: 'loading', to: 'error', label: 'Falhou' },
+  { from: 'error', to: 'loading', label: 'Tentar de novo' },
+];
+export async function createWorkspace(folder: string, title = 'Meu espaço', options: { flow?: boolean } = {}): Promise<string> {
   const destination = path.resolve(folder);
   try { await access(destination); throw new RequestError('A pasta de destino já existe. Escolha outro nome.'); } catch (error) { if (error instanceof RequestError) throw error; }
-  await mkdir(path.join(destination, 'frames/main'), { recursive: true });
-  await writeFile(path.join(destination, 'experiment.json'), `${JSON.stringify({ id: 'workspace', title, frames: [{ id: 'main', title: 'Primeiro protótipo', entry: 'frames/main/index.html', viewport: { width: 390, height: 620 } }] }, null, 2)}\n`, { flag: 'wx' });
+  const frames = options.flow ? FLOW_STATES : [{ id: 'main', title: 'Primeiro protótipo', body: 'Comece a explorar esta ideia.' }];
+  const viewport = { width: 390, height: 620 };
+  for (const frame of frames) {
+    await mkdir(path.join(destination, 'frames', frame.id), { recursive: true });
+    await writeFile(path.join(destination, 'frames', frame.id, 'index.html'), frameHtml(frame.title, frame.body), { flag: 'wx' });
+    await writeFile(path.join(destination, 'frames', frame.id, 'README.md'), `# ${frame.title}\n\nDescreva a intenção desta alternativa.\n`, { flag: 'wx' });
+  }
+  const manifest = {
+    schemaVersion: SCHEMA_VERSION,
+    id: 'workspace',
+    title,
+    decision: { hypothesis: '', criteria: '' },
+    frames: frames.map(frame => ({ id: frame.id, title: frame.title, entry: `frames/${frame.id}/index.html`, viewport, ...(options.flow ? { state: frame.id } : {}) })),
+    edges: options.flow ? FLOW_EDGES : [],
+  };
+  await writeFile(path.join(destination, 'experiment.json'), `${JSON.stringify(manifest, null, 2)}\n`, { flag: 'wx' });
   await writeFile(path.join(destination, 'README.md'), `# ${title}\n\nDescreva aqui o que você está explorando.\n`, { flag: 'wx' });
-  await writeFile(path.join(destination, 'frames/main/index.html'), frameHtml('Primeiro protótipo', 'Comece a explorar esta ideia.'), { flag: 'wx' });
-  await writeFile(path.join(destination, 'frames/main/README.md'), '# Primeiro protótipo\n\nDescreva a intenção desta alternativa.\n', { flag: 'wx' });
   return realpath(destination);
 }
 export function validateTarget(value: unknown): Target {
@@ -141,7 +162,34 @@ export class WorkspaceStore {
   private migratedState = false;
   constructor(public root: string) {}
   async initialize() { this.root = await realpath(this.root); await this.migrateState(); await this.migrateLegacyEdits(); await this.snapshot(); }
-  private async migrateState() { if (this.migratedState) return; this.migratedState = true; this.root = await realpath(this.root); await migrateLegacyState(this.root); }
+  private async migrateState() { if (this.migratedState) return; this.migratedState = true; this.root = await realpath(this.root); await migrateLegacyState(this.root); await this.migrateConnections(); }
+  private async readManifest() {
+    let raw: unknown;
+    try { raw = JSON.parse(await readFile(await confined(this.root, 'experiment.json'), 'utf8')); } catch (error) { if (error instanceof RequestError) throw error; throw new RequestError('Crie um experiment.json para salvar alterações no estudo.'); }
+    return { raw, experiment: parseExperiment(raw) };
+  }
+  private async writeManifest(raw: unknown, experiment: Experiment, renamed: Record<string, string> = {}) { await this.atomic('experiment.json', serializeManifest(raw, experiment, renamed)); }
+  /** Flow links used to live in `.draft/layout.json`, which is not shared through Git; move them into the manifest. */
+  private async migrateConnections() {
+    const layoutText = await readStateFile(this.root, 'layout.json');
+    if (!layoutText) return;
+    let layout: unknown;
+    try { layout = JSON.parse(layoutText); } catch { return; }
+    if (!record(layout) || !Array.isArray(layout.connections) || !layout.connections.length) return;
+    let manifest;
+    try { manifest = await this.readManifest(); } catch { return; }
+    const ids = new Set(manifest.experiment.frames.map(frame => frame.id));
+    const edges = [...manifest.experiment.edges];
+    for (const connection of layout.connections) {
+      if (!record(connection) || typeof connection.from !== 'string' || typeof connection.to !== 'string' || connection.from === connection.to || !ids.has(connection.from) || !ids.has(connection.to)) continue;
+      if (edges.some(edge => edge.from === connection.from && edge.to === connection.to)) continue;
+      edges.push({ from: connection.from, to: connection.to, label: typeof connection.label === 'string' ? connection.label.slice(0, 240) : '' });
+    }
+    await this.writeManifest(manifest.raw, { ...manifest.experiment, edges });
+    const { connections: _dropped, ...rest } = layout;
+    await this.stateDirectory();
+    await this.atomic(`${STATE_DIR}/layout.json`, rest);
+  }
   private async sharedSheets(experiment: Experiment, frameId: string) {
     const shared = new Set<string>();
     for (const frame of experiment.frames) if (frame.id !== frameId) for (const sheet of await stylesheetsOf(this.root, frame)) shared.add(sheet);
@@ -181,8 +229,8 @@ export class WorkspaceStore {
     await this.migrateState();
     await this.migrateLegacyEdits();
     const diagnostics: string[] = [];
-    let experiment: Experiment = { id: 'invalid', title: path.basename(this.root), frames: [] };
-    try { experiment = (await discoverExperiment(this.root)).experiment; } catch (error) { diagnostics.push(error instanceof Error ? error.message : 'Manifesto inválido.'); }
+    let experiment: Experiment = { schemaVersion: SCHEMA_VERSION, id: 'invalid', title: path.basename(this.root), frames: [], edges: [] };
+    try { const discovery = await discoverExperiment(this.root); experiment = discovery.experiment; diagnostics.push(...discovery.diagnostics); } catch (error) { diagnostics.push(error instanceof Error ? error.message : 'Manifesto inválido.'); }
     for (const frame of experiment.frames) {
       try { if (!publicPath(frame.entry) || path.extname(frame.entry) !== '.html') throw new Error('A entrada precisa ser um HTML público.'); const resolvedEntry = await confined(this.root, frame.entry); if (!publicPath(path.relative(this.root, resolvedEntry))) throw new Error('Entrada privada.'); frame.url = `${this.contentOrigin}/${frame.entry.split('/').map(encodeURIComponent).join('/')}`; } catch { frame.error = 'Não foi possível abrir o HTML deste frame.'; }
       frame.readme = await optionalText(this.root, path.join(path.dirname(frame.entry), 'README.md'));
@@ -200,7 +248,12 @@ export class WorkspaceStore {
   private async stateDirectory() { const directory = path.join(this.root, STATE_DIR); await mkdir(directory, { recursive: true }); if ((await lstat(directory)).isSymbolicLink()) throw new RequestError('A pasta de estado não pode ser um symlink.', 403); return confined(this.root, STATE_DIR); }
   private async atomic(relative: string, value: unknown) { const directory = await confined(this.root, path.dirname(relative)); const destination = path.join(directory, path.basename(relative)); try { await confined(this.root, relative); } catch (error) { if (error instanceof RequestError) throw error; } const temporary = `${destination}.${randomUUID()}.tmp`; await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { flag: 'wx' }); await rename(temporary, destination); }
   mutate(operation: () => Promise<void>): Promise<Workspace> { const result = this.queue.then(async () => { this.root = await realpath(this.root); await operation(); return this.snapshot(); }); this.queue = result.catch(() => {}); return result; }
-  saveLayout(body: Record<string, unknown>) { return this.mutate(async () => { const workspace = await this.snapshot(); if (body.revision !== workspace.revision) throw new RequestError('A composição mudou. Recarregue antes de salvar.', 409); const layout = validateLayout(body.layout); await this.stateDirectory(); await this.atomic(`${STATE_DIR}/layout.json`, layout); }); }
+  saveLayout(body: Record<string, unknown>) { return this.mutate(async () => { const workspace = await this.snapshot(); if (body.revision !== workspace.revision) throw new RequestError('A composição mudou. Recarregue antes de salvar.', 409); const { connections: _legacy, ...layout } = validateLayout(body.layout); await this.stateDirectory(); await this.atomic(`${STATE_DIR}/layout.json`, layout); }); }
+  saveEdges(body: Record<string, unknown>) { return this.mutate(async () => {
+    const { raw, experiment } = await this.readManifest();
+    const edges = validateEdges(body.edges, new Set(experiment.frames.map(frame => frame.id)));
+    await this.writeManifest(raw, { ...experiment, edges });
+  }); }
   saveEdit(body:Record<string,unknown>){return this.mutate(async()=>{
     const workspace=await this.snapshot();
     const frame=workspace.experiment.frames.find(candidate=>candidate.id===body.frameId);
@@ -232,21 +285,20 @@ export class WorkspaceStore {
     const directory = await this.stateDirectory(); try { await confined(this.root, `${STATE_DIR}/feedback.jsonl`); if ((await lstat(path.join(directory, 'feedback.jsonl'))).isSymbolicLink()) throw new RequestError('O arquivo de feedback não pode ser um symlink.', 403); } catch (error) { if (error instanceof RequestError) throw error; } await appendFile(path.join(directory, 'feedback.jsonl'), `${JSON.stringify(event)}\n`);
   }); }
   changeFrame(id: string, action: string, body: Record<string, unknown>) { return this.mutate(async () => {
-    const raw: unknown = JSON.parse(await readFile(await confined(this.root, 'experiment.json'), 'utf8')); const experiment = parseExperiment(raw); let addedFrameId: string | undefined; const frame = experiment.frames.find(frame => frame.id === id); if (!frame) throw new RequestError('Frame não encontrado.', 404);
+    const { raw, experiment } = await this.readManifest(); const renamed: Record<string, string> = {}; const frame = experiment.frames.find(frame => frame.id === id); if (!frame) throw new RequestError('Frame não encontrado.', 404);
     if (action === 'rename') { if (typeof body.title !== 'string' || !body.title.trim() || body.title.length > 200) throw new RequestError('Título inválido.'); frame.title = body.title.trim(); }
     if (action === 'duplicate') {
       const source = await confined(this.root, path.dirname(frame.entry)); if (source === this.root || path.dirname(path.dirname(frame.entry)) !== 'frames') throw new RequestError('Duplicação exige uma pasta própria em frames/<id>/.');
-      const duplicateId = `${id}-copy-${randomUUID().slice(0, 6)}`; addedFrameId = duplicateId; const parent = await confined(this.root, 'frames'); const destination = path.join(parent, duplicateId); try { await access(destination); throw new RequestError('Destino já existe.'); } catch (error) { if (error instanceof RequestError) throw error; }
+      const duplicateId = `${id}-copy-${randomUUID().slice(0, 6)}`; renamed[duplicateId] = id; const parent = await confined(this.root, 'frames'); const destination = path.join(parent, duplicateId); try { await access(destination); throw new RequestError('Destino já existe.'); } catch (error) { if (error instanceof RequestError) throw error; }
       await cp(source, destination, { recursive: true, dereference: false, errorOnExist: true, force: false, filter: async sourcePath => { if ((await lstat(sourcePath)).isSymbolicLink()) throw new RequestError('Duplicação não aceita symlinks.'); await confined(this.root, path.relative(this.root, sourcePath)); return !path.relative(source, sourcePath).split(path.sep).some(segment => segment.startsWith('.')); } });
-      experiment.frames.push({ ...frame, id: duplicateId, title: `${frame.title} · cópia`, entry: `frames/${duplicateId}/${path.basename(frame.entry)}` });
+      experiment.frames.push({ ...frame, id: duplicateId, title: `${frame.title} · cópia`, entry: `frames/${duplicateId}/${path.basename(frame.entry)}`, ...(frame.role === 'control' ? { role: 'variant' as const } : {}) });
     }
-    await this.atomic('experiment.json', { ...(record(raw) ? raw : {}), frames: experiment.frames.map(frame => { const original = record(raw) && Array.isArray(raw.frames) ? raw.frames.find((candidate: unknown) => record(candidate) && candidate.id === (frame.id === addedFrameId ? id : frame.id)) : undefined; return { ...(record(original) ? original : {}), ...frame }; }) });
+    await this.writeManifest(raw, experiment, renamed);
   }); }
   createFrame(title: string) { return this.mutate(async () => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle || trimmedTitle.length > 200) throw new RequestError('Título inválido.');
-    const raw: unknown = JSON.parse(await readFile(await confined(this.root, 'experiment.json'), 'utf8'));
-    const experiment = parseExperiment(raw);
+    const { raw, experiment } = await this.readManifest();
     const baseId = trimmedTitle.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'prototipo';
     const usedIds = new Set(experiment.frames.map(frame => frame.id));
     let frameId = baseId;
@@ -261,7 +313,7 @@ export class WorkspaceStore {
     await writeFile(path.join(frameDirectory, 'index.html'), frameHtml(trimmedTitle, 'Comece a explorar esta alternativa.'), { flag: 'wx' });
     await writeFile(path.join(frameDirectory, 'README.md'), `# ${trimmedTitle}\n\nDescreva a intenção desta alternativa.\n`, { flag: 'wx' });
     experiment.frames.push({ id: frameId, title: trimmedTitle, entry, viewport: { width: 390, height: 844 } });
-    await this.atomic('experiment.json', { ...(record(raw) ? raw : {}), frames: experiment.frames });
+    await this.writeManifest(raw, experiment);
   }); }
   async loadPresence(includeExpired = false): Promise<PresenceState> {
     await this.migrateState();

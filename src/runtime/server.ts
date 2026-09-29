@@ -67,6 +67,7 @@ export async function startRuntime(folder: string, port = 4173) {
         const payload = await body(request); let workspace;
         if (pathname === '/api/layout') workspace = await store.saveLayout(payload);
         else if (pathname === '/api/edits') workspace = await store.saveEdit(payload);
+        else if (pathname === '/api/edges') workspace = await store.saveEdges(payload);
         else if (pathname === '/api/feedback') workspace = await store.feedback(payload);
         else if (/^\/api\/feedback\/[^/]+$/.test(pathname)) workspace = await store.feedback(payload, pathname.split('/')[3]);
         else if (pathname === '/api/frames') workspace = await store.createFrame(typeof payload.title === 'string' ? payload.title : '');

@@ -8,7 +8,7 @@ import { buildContext, feedbackItems } from './agent.js';
 const USAGE = [
   'Uso:',
   '  draft open [pasta]',
-  '  draft create <pasta> [título]',
+  '  draft create <pasta> [título] [--flow]',
   '  draft inspect [pasta]',
   '  draft context [pasta]',
   '  draft feedback list [pasta] [--open]',
@@ -46,8 +46,8 @@ try {
     console.log(`Bundle somente leitura: ${path.resolve(output)}`);
   } else if (command === 'create') {
     const [folder, title] = rest;
-    if (!folder) throw new Error('Uso: draft create <pasta> [título]');
-    console.log(`Workspace criado: ${await createWorkspace(path.resolve(folder), title || 'Meu espaço')}`);
+    if (!folder) throw new Error('Uso: draft create <pasta> [título] [--flow]');
+    console.log(`Workspace criado: ${await createWorkspace(path.resolve(folder), title || 'Meu espaço', { flow: flags.flow === 'true' })}`);
   } else if (command === 'inspect') {
     const discovery = await discoverExperiment(path.resolve(rest[0] ?? '.'));
     print({ generated: discovery.generated, experiment: discovery.experiment });

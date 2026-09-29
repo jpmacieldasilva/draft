@@ -42,6 +42,7 @@ export function agentRules(folder: string) {
     'Coloque data-draftroom-id estável nos elementos que recebem comentários ou ajustes do Inspect.',
     `Depois de atender um comentário: draft feedback resolve ${quoted} <id>.`,
     'Não altere .draft/ diretamente: é estado local do viewer.',
+    'Estados de fluxo (state), papéis (role: control | variant, por group), decision e edges ficam no experiment.json. Preserve campos que você não conhece.',
   ];
 }
 
@@ -54,6 +55,7 @@ export async function buildContext(store: WorkspaceStore) {
     const claim = presence.find(actor => actor.frameId === frame.id);
     return {
       id: frame.id, title: frame.title, entry: frame.entry, viewport: frame.viewport,
+      ...Object.fromEntries((['state', 'role', 'group', 'tests', 'signal'] as const).filter(field => frame[field] !== undefined).map(field => [field, frame[field]])),
       ...(frame.readme ? { readme: frame.readme } : {}),
       ...(frame.error ? { error: frame.error } : {}),
       files: await frameFiles(store.root, frame.entry),
@@ -62,8 +64,11 @@ export async function buildContext(store: WorkspaceStore) {
     };
   }));
   return {
+    schemaVersion: workspace.experiment.schemaVersion,
     workspace: { id: workspace.experiment.id, title: workspace.experiment.title, readme: workspace.readme },
+    ...(workspace.experiment.decision ? { decision: workspace.experiment.decision } : {}),
     frames,
+    edges: workspace.experiment.edges,
     feedback: feedbackItems(open),
     presence,
     diagnostics: workspace.diagnostics,
