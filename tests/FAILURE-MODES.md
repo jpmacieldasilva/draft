@@ -22,3 +22,23 @@ Rodar: `npm run build && npm run test:e2e`. Evidência: `e2e-evidence/evidence.j
 5. Um resolve feito pelo CLI não aparece no viewer aberto. (`agent.spec.ts` — "resolve pelo CLI aparece no viewer aberto")
 6. Com o manifesto quebrado, `context` imprime algo vago ou sai com código 0. (`agent.spec.ts` — "manifesto inválido faz context falhar com a mensagem exata")
 7. O agente edita um frame que outra pessoa ou agente reivindicou, porque `context` não mostra os claims ativos. (`agent.spec.ts` — "context mostra claims ativos por frame")
+
+## Fase 2 — Manifesto v2 (estados, grafo, decisão)
+
+Manifesto:
+
+1. Um manifesto v1 sem `schemaVersion` deixa de abrir, ou é reescrito só por ter sido aberto. (`manifest.spec.ts` — "manifesto v1 sem schemaVersion abre sem ser reescrito")
+2. A migração perde campos desconhecidos do manifesto ou dos frames. (`manifest.spec.ts` — "migra conexões do layout para edges sem perder campos desconhecidos")
+3. As conexões antigas em `.draft/layout.json` somem sem ir para o manifesto, ou continuam só no estado local. (mesmo cenário)
+4. Uma aresta aponta para um frame inexistente, ou aparece duplicada, e o viewer quebra ou desenha lixo; a API aceita salvar isso. (`manifest.spec.ts` — "aresta para frame inexistente ou duplicada é ignorada com aviso")
+5. Um ciclo no fluxo (erro → tentar de novo → carregando) trava o viewer ou o `context`. (`manifest.spec.ts` — "ciclos no fluxo não travam viewer nem context")
+6. `role: control` aparece em mais de um frame do mesmo grupo sem aviso. (`manifest.spec.ts` — "mais de um controle no mesmo grupo gera aviso")
+7. Uma conexão desenhada no canvas vai para `.draft/` (que não vai para o Git) em vez do manifesto. (`workflows.spec.ts` — "cria conexão rotulada e navega no minimapa")
+8. Renomear ou duplicar um frame pela interface apaga `decision`, `edges` ou metadados; duplicar o controle cria um segundo controle. (`manifest.spec.ts` — "renomear e duplicar preservam decisão, arestas e papéis")
+9. `draft create --flow` gera estados sem arestas, ou arestas para frames que não existem. (`manifest.spec.ts` — "create --flow gera estados ligados")
+
+Interface:
+
+10. Estado e papel do frame não aparecem no canvas. (`manifest.spec.ts` — "selos de estado e papel aparecem no cabeçalho do frame")
+11. Hipótese, critério, o que o frame testa e o sinal pretendido não aparecem para quem revisa. (`manifest.spec.ts` — "decisão, teste e sinal aparecem no painel de informações")
+12. O modo comparar aparece sem controle, mostra o par errado ou esconde o critério. (`manifest.spec.ts` — "comparar mostra controle e variante lado a lado com o critério")

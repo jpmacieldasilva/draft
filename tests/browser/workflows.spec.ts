@@ -228,7 +228,8 @@ test('cria conexão rotulada e navega no minimapa',async({page})=>{
  await page.getByRole('textbox',{name:'Rótulo',exact:true}).fill('Escolher um texto');
  await page.getByRole('button',{name:'Salvar conexão',exact:true}).click();
  await expect(page.locator('.flow-label')).toHaveText('Escolher um texto');
- await expect.poll(async()=>JSON.parse(await readFile(path.join(stateDir(folder),'layout.json'),'utf8').catch(()=>'{}')).connections?.[0]?.label).toBe('Escolher um texto');
+ await expect.poll(async()=>JSON.parse(await readFile(path.join(folder,'experiment.json'),'utf8')).edges?.[0]).toEqual({from:'editorial',to:'compact',label:'Escolher um texto'});
+ expect(JSON.parse(await readFile(path.join(stateDir(folder),'layout.json'),'utf8').catch(()=>'{}')).connections).toBeUndefined();
  await page.reload();await expect(page.locator('.flow-label')).toHaveText('Escolher um texto');
  const world=page.locator('.world');const previous=await world.getAttribute('style');
  await page.locator('.minimap svg').click({position:{x:20,y:20}});

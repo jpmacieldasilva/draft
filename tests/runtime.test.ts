@@ -75,12 +75,4 @@ describe('Ajustes visuais e fluxos',()=>{
    await assert.rejects(store.saveEdit({frameId:'missing',selector:'button',styles:{color:'#fff'}}));
   }finally{await rm(root,{recursive:true});}
  });
- test('persiste conexões e rejeita pontas inexistentes',async()=>{
-  const root=await fixture();try{const store=new WorkspaceStore(root);const initial=await store.snapshot();
-   const position={x:0,y:0,width:800,height:600};const connection={id:'link-1',from:'one',to:'broken',label:'Continuar'};
-   const layout={frames:{one:position,broken:{...position,x:900}},x:0,y:0,zoom:1,connections:[connection]};
-   const saved=await store.saveLayout({revision:initial.revision,layout});assert.deepEqual(saved.layout?.connections,[connection]);
-   await assert.rejects(store.saveLayout({revision:saved.revision,layout:{...layout,connections:[{...connection,to:'missing'}]}}));
-  }finally{await rm(root,{recursive:true});}
- });
 });
