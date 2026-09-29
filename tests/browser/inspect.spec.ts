@@ -15,7 +15,7 @@ test('ajuste em CSS compartilhado fica só no frame editado', async ({ page, stu
  await editorial.click();
  await page.getByRole('spinbutton', { name: 'Tamanho do texto (px)', exact: true }).fill('51');
  await page.getByRole('button', { name: 'Salvar ajuste', exact: true }).click();
- await expect(page.getByText('Ajuste salvo.', { exact: true })).toBeVisible();
+ await expect(page.getByRole('status').filter({ hasText: 'Salvo em frames/editorial/index.html' })).toBeVisible();
  expect(await read(studio.folder, 'shared/style.css')).toBe(sharedBefore);
  await expect.poll(async () => /font-size:\s*51px/.test(await read(studio.folder, 'frames/editorial/index.html'))).toBe(true);
  await page.reload();
@@ -56,9 +56,9 @@ test('títulos com caracteres especiais geram HTML válido', async ({ page, stud
  await page.getByRole('button', { name: 'Adicionar protótipo', exact: true }).click();
  await page.getByRole('textbox', { name: 'Nome da alternativa' }).fill(title);
  await page.getByRole('button', { name: 'Criar protótipo', exact: true }).click();
- const manifest = JSON.parse(await read(studio.folder, 'experiment.json')) as { frames: Array<{ id: string; title: string; entry: string }> };
- const created = manifest.frames.at(-1)!;
- expect(created.title).toBe(title);
+ const lastFrame = async () => (JSON.parse(await read(studio.folder, 'experiment.json')) as { frames: Array<{ id: string; title: string; entry: string }> }).frames.at(-1)!;
+ await expect.poll(async () => (await lastFrame()).title).toBe(title);
+ const created = await lastFrame();
  const html = await read(studio.folder, created.entry);
  expect(html).not.toContain('<b>');
  expect(html).toContain('Plano &lt;b&gt;A&lt;/b&gt; &amp; &quot;rápido&quot;');
@@ -84,8 +84,10 @@ test('estado legado em .draftroom migra para .draft sem perder comentários', as
  try {
   expect((await api(viewer.url, 'feedback', { frameId: 'compact', message: 'Comentário novo', target: { kind: 'region', label: 'Área', rect: { x: 1, y: 1, width: 20, height: 20 } } })).status).toBe(200);
   await page.goto(viewer.url);
-  await page.getByRole('button', { name: /^Comentários/ }).click();
+  await page.locator('article[data-frame-id="editorial"] .pin').click();
   await expect(page.getByText('Comentário antigo', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.locator('article[data-frame-id="compact"] .pin').click();
   await expect(page.getByText('Comentário novo', { exact: true })).toBeVisible();
   const log = await read(workspace, '.draft/feedback.jsonl');
   expect(log).toContain('Comentário antigo');

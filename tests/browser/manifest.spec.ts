@@ -1,4 +1,4 @@
-import { test, expect, startViewer, runCli, api } from './harness';
+import { test, expect, startViewer, runCli, api, PROTOTYPE_LINKS_UI } from './harness';
 import { readFile, writeFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -32,7 +32,8 @@ test('migra conexões do layout para edges sem perder campos desconhecidos', asy
   expect(layout.connections).toBeUndefined();
   expect(layout.frames.compact.x).toBe(500);
   await page.goto(viewer.url);
-  await expect(page.locator('.flow-label')).toHaveText('Abrir lista');
+  await expect(page.locator('.flow-label')).toHaveCount(PROTOTYPE_LINKS_UI ? 1 : 0);
+  if (PROTOTYPE_LINKS_UI) await expect(page.locator('.flow-label')).toHaveText('Abrir lista');
  } finally { viewer.process.kill('SIGTERM'); }
 });
 
@@ -41,7 +42,8 @@ test('aresta para frame inexistente ou duplicada é ignorada com aviso', async (
  const viewer = await startViewer(workspace);
  try {
   await page.goto(viewer.url);
-  await expect(page.locator('.flow-label')).toHaveText('Ir');
+  await expect(page.locator('.flow-label')).toHaveCount(PROTOTYPE_LINKS_UI ? 1 : 0);
+  if (PROTOTYPE_LINKS_UI) await expect(page.locator('.flow-label')).toHaveText('Ir');
   await expect(page.getByRole('alert')).toContainText('frame inexistente');
   await expect(page.getByRole('alert')).toContainText('duplicada');
   const rejected = await api(viewer.url, 'edges', { edges: [{ from: 'editorial', to: 'fantasma', label: '' }] });
@@ -57,7 +59,7 @@ test('ciclos no fluxo não travam viewer nem context', async ({ page, workspace 
  const viewer = await startViewer(workspace);
  try {
   await page.goto(viewer.url);
-  await expect(page.locator('.flow-label')).toHaveCount(3);
+  await expect(page.locator('.flow-label')).toHaveCount(PROTOTYPE_LINKS_UI ? 3 : 0);
   const context = await runCli(['context', workspace]);
   expect(context.code).toBe(0);
   expect(context.json<{ edges: unknown[] }>().edges).toHaveLength(3);
@@ -112,7 +114,7 @@ test('create --flow gera estados ligados', async ({ page }) => {
   try {
    await page.goto(viewer.url);
    await expect(page.locator('iframe')).toHaveCount(4);
-   await expect(page.locator('.flow-label')).toHaveCount(4);
+   await expect(page.locator('.flow-label')).toHaveCount(PROTOTYPE_LINKS_UI ? 4 : 0);
    await expect(page.getByRole('alert')).toHaveCount(0);
   } finally { viewer.process.kill('SIGTERM'); }
  } finally { await rm(parent, { recursive: true, force: true }); }

@@ -1,4 +1,4 @@
-import { test, expect } from './harness';
+import { test, expect, PROTOTYPE_LINKS_UI } from './harness';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -25,10 +25,10 @@ test('preserva interação entre canvas, apresentação e retorno',async({page})
  await page.getByRole('button',{name:'Apresentar Biblioteca editorial',exact:true}).click();
  await expect(page).toHaveURL(/#frame\/editorial$/);
  await expect(frame.getByRole('button',{name:'Guardado ✓'})).toBeVisible();
- await page.getByRole('button',{name:'Tela cheia',exact:true}).click();
- await expect.poll(()=>page.evaluate(()=>Boolean(document.fullscreenElement))).toBe(true);
+ const fill=page.getByRole('button',{name:'Preencher tela',exact:true});
+ await fill.click();
+ await expect(fill).toHaveAttribute('aria-pressed','true');
  await page.getByRole('button',{name:/Canvas/}).click();
- await expect.poll(()=>page.evaluate(()=>Boolean(document.fullscreenElement))).toBe(false);
  await expect(frame.getByRole('button',{name:'Guardado ✓'})).toBeVisible();
  await page.getByRole('button',{name:'Um espaço para ler',exact:false}).click();
  await expect(page.getByRole('dialog')).toContainText('Three paths');
@@ -39,40 +39,32 @@ test('abre inspector ao selecionar elemento sem misturar comentários',async({pa
  await page.goto(url);
  await page.getByRole('button',{name:'Inspecionar',exact:false}).click();
  await page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('heading',{name:'A arte de prestar atenção'}).click();
- await expect(page.getByRole('complementary',{name:'Inspector'})).toBeVisible();
+ await expect(page.getByRole('complementary',{name:'Inspecionar'})).toBeVisible();
  await expect(page.getByRole('button',{name:'Salvar ajuste',exact:true})).toBeVisible();
  await expect(page.getByRole('textbox',{name:'O que precisa mudar?'})).toHaveCount(0);
 });
 
-test('persiste comentário de região, resolve e reabre na pasta',async({page})=>{
+test('persiste comentário em elemento, resolve e reabre na pasta',async({page})=>{
  await page.goto(url);
  await page.getByRole('button',{name:'Biblioteca editorial',exact:true}).click();
  await page.getByRole('button',{name:'Centralizar frames',exact:true}).click();
  await page.getByRole('button',{name:'Comentar',exact:false}).click();
- await expect(page.getByText(/Arraste no protótipo para marcar uma região/)).toBeVisible();
- const iframe=page.locator('iframe[title="Biblioteca editorial"]');
- await expect.poll(async()=>{
-  const region=await iframe.boundingBox();
-  if(!region)return false;
-  await page.mouse.move(region.x+40,region.y+70);
-  await page.mouse.down();
-  await page.mouse.move(region.x+region.width-50,region.y+region.height-60,{steps:15});
-  await page.mouse.up();
-  return page.getByText('Região selecionada').isVisible();
- },{timeout:15_000}).toBe(true);
- await page.getByRole('textbox',{name:'O que precisa mudar?'}).fill('Dar mais espaço ao título.');
- await page.getByRole('button',{name:'Salvar comentário'}).click();
- await expect(page.getByRole('button',{name:'Resolver',exact:true})).toBeVisible();
+ await page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('heading',{name:'A arte de prestar atenção'}).click();
+ const popover=page.getByRole('dialog',{name:'Comentário',exact:true});
+ await popover.getByRole('textbox').fill('Dar mais espaço ao título.');
+ await popover.getByRole('button',{name:'Salvar comentário'}).click();
+ await page.locator('article[data-frame-id="editorial"] .pin').click();
+ await expect(popover.getByRole('button',{name:'Resolver',exact:true})).toBeVisible();
  await page.reload();
- await page.getByRole('button',{name:/^Comentários/}).click();
- await expect(page.getByText('Dar mais espaço ao título.',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:'Resolver',exact:true}).click();
- await expect(page.getByRole('button',{name:'Reabrir',exact:true})).toBeVisible();
- await page.getByRole('button',{name:'Reabrir',exact:true}).click();
- await expect(page.getByRole('button',{name:'Resolver',exact:true})).toBeVisible();
+ await page.locator('article[data-frame-id="editorial"] .pin').click();
+ await expect(popover.getByText('Dar mais espaço ao título.',{exact:true})).toBeVisible();
+ await popover.getByRole('button',{name:'Resolver',exact:true}).click();
+ await expect(popover.getByRole('button',{name:'Reabrir',exact:true})).toBeVisible();
+ await popover.getByRole('button',{name:'Reabrir',exact:true}).click();
+ await expect(popover.getByRole('button',{name:'Resolver',exact:true})).toBeVisible();
  const log=await readFile(path.join(stateDir(folder),'feedback.jsonl'),'utf8');
  expect(log.trim().split('\n')).toHaveLength(3);
- expect(log).toContain('"kind":"region"');
+ expect(log).toContain('"kind":"element"');
 });
 
 test('recarrega apenas o frame alterado e preserva outro formulário',async({page})=>{
@@ -125,27 +117,18 @@ test('persiste movimento e tamanho do frame',async({page})=>{
  await expect.poll(async()=>JSON.parse(await readFile(path.join(stateDir(folder),'layout.json'),'utf8').catch(()=>'{"frames":{"editorial":{"x":0,"width":390}}}')).frames.editorial.width).toBeGreaterThan(390);
 });
 
-test('marca região e persiste comentário',async({page})=>{
+test('marca elemento e persiste comentário',async({page})=>{
  await page.goto(url);
  await page.getByRole('button',{name:'Biblioteca editorial',exact:true}).click();
  await page.getByRole('button',{name:'Centralizar frames',exact:true}).click();
  await page.getByRole('button',{name:'Comentar',exact:false}).click();
- await expect(page.getByText(/Arraste no protótipo para marcar uma região/)).toBeVisible();
- const iframe=page.locator('iframe[title="Biblioteca editorial"]');
- await expect.poll(async()=>{
-  const region=await iframe.boundingBox();
-  if(!region)return false;
-  await page.mouse.move(region.x+40,region.y+70);
-  await page.mouse.down();
-  await page.mouse.move(region.x+region.width-50,region.y+region.height-60,{steps:15});
-  await page.mouse.up();
-  return page.getByText('Região selecionada').isVisible();
- },{timeout:15_000}).toBe(true);
- await expect(page.getByRole('textbox',{name:'O que precisa mudar?'})).toBeVisible();
- await page.getByRole('textbox',{name:'O que precisa mudar?'}).fill('Rever o espaço desta região.');
- await page.getByRole('button',{name:'Salvar comentário'}).click();
- await expect(page.getByRole('button',{name:'Resolver',exact:true})).toBeVisible();
- expect(await readFile(path.join(stateDir(folder),'feedback.jsonl'),'utf8')).toContain('"kind":"region"');
+ await page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('heading',{name:'A arte de prestar atenção'}).click();
+ const popover=page.getByRole('dialog',{name:'Comentário',exact:true});
+ await popover.getByRole('textbox').fill('Rever o espaço deste título.');
+ await popover.getByRole('button',{name:'Salvar comentário'}).click();
+ await page.locator('article[data-frame-id="editorial"] .pin').click();
+ await expect(popover.getByRole('button',{name:'Resolver',exact:true})).toBeVisible();
+ expect(await readFile(path.join(stateDir(folder),'feedback.jsonl'),'utf8')).toContain('"kind":"element"');
 });
 
 test('bundle estático abre em subpasta sem API e preserva interação',async({page})=>{
@@ -205,7 +188,7 @@ test('edita visualmente, preserva ajustes sucessivos e restaura o original',asyn
  await page.getByRole('spinbutton',{name:'Tamanho do texto (px)',exact:true}).fill('30');
  await expect(title).toHaveCSS('font-size','30px');
  await page.getByRole('button',{name:'Salvar ajuste',exact:true}).click();
- await expect(page.getByText('Ajuste salvo.',{exact:true})).toBeVisible();
+ await expect(page.getByRole('status').filter({hasText:'Salvo em frames/editorial/index.html'})).toBeVisible();
  await page.getByText('Espaçamento',{exact:true}).click();
  await page.getByRole('spinbutton',{name:'Espaço interno (px)',exact:true}).fill('12');
  await page.getByRole('button',{name:'Salvar ajuste',exact:true}).click();
@@ -213,12 +196,14 @@ test('edita visualmente, preserva ajustes sucessivos e restaura o original',asyn
  await page.reload();await expect(title).toHaveCSS('font-size','30px');await expect(title).toHaveCSS('padding-top','12px');
  await page.getByRole('button',{name:'Inspecionar',exact:false}).click();await title.click();
  await page.getByRole('button',{name:'Restaurar original',exact:true}).click();
+ await page.getByRole('button',{name:'Remover ajustes',exact:true}).click();
  await expect.poll(async()=>!(/font-size:\s*30px/i.test(await readFile(path.join(folder,'frames/editorial/index.html'),'utf8')))).toBe(true);
  await expect.poll(async()=>await title.evaluate(element=>getComputedStyle(element).fontSize)).toBe('23px');
  await expect.poll(async()=>await title.evaluate(element=>getComputedStyle(element).paddingTop)).toBe('0px');
 });
 
 test('cria conexão rotulada e navega no minimapa',async({page})=>{
+ test.skip(!PROTOTYPE_LINKS_UI, 'ligação entre protótipos desligada no viewer');
  await page.goto(url);
  await expect(page.getByRole('button',{name:'Sobre o espaço',exact:true})).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Região',exact:true})).toHaveCount(0);
@@ -237,6 +222,14 @@ test('cria conexão rotulada e navega no minimapa',async({page})=>{
  await page.getByRole('button',{name:'Centralizar frames',exact:true}).click();
 });
 
+test('navega no minimapa',async({page})=>{
+ await page.goto(url);
+ const world=page.locator('.world');const previous=await world.getAttribute('style');
+ await page.locator('.minimap svg').click({position:{x:20,y:20}});
+ await expect(world).not.toHaveAttribute('style',previous??'');
+ await page.getByRole('button',{name:'Centralizar frames',exact:true}).click();
+});
+
 test('altera viewport por preset sem recarregar o protótipo',async({page})=>{
  await page.goto(url);
  const frame=page.frameLocator('iframe[title="Biblioteca editorial"]');
@@ -248,6 +241,7 @@ test('altera viewport por preset sem recarregar o protótipo',async({page})=>{
 });
 
 test('puxa uma curva entre protótipos e remove a conexão',async({page})=>{
+ test.skip(!PROTOTYPE_LINKS_UI, 'ligação entre protótipos desligada no viewer');
  await page.goto(url);
  const start=await page.locator('[data-frame-connector="editorial"]').boundingBox();
  const end=await page.locator('iframe[title="Leitura em movimento"]').boundingBox();
