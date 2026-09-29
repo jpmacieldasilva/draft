@@ -1,7 +1,7 @@
 import type { Feedback, Frame, Layout, Position, PresenceActor, Target, Workspace } from '../protocol';
 declare global { interface Window { __DRAFTROOM__?: Workspace } }
 export type Mode = 'interact' | 'element' | 'comment';
-interface State { workspace?: Workspace; layout: Layout; mode: Mode; selected?: string; presenting?: string; info?: string; target?: {frameId: string; target: Target}; feedback?: string; error?: string; busy: boolean; comments: boolean; inspector: boolean; newFrame?: boolean }
+interface State { workspace?: Workspace; layout: Layout; mode: Mode; selected?: string; presenting?: string; info?: string; target?: {frameId: string; target: Target}; feedback?: string; error?: string; busy: boolean; comments: boolean; inspector: boolean; newFrame?: boolean; compare?: { group: string; variant?: string } }
 const listeners = new Set<() => void>();
 let layoutDirty = false;
 let layoutRevision = '';
@@ -111,7 +111,7 @@ function onMessage(event:MessageEvent<unknown>) {
  }
 }
 function onKey(event:KeyboardEvent) {
- if(event.key==='Escape') { setMode('interact'); update({target:undefined,info:undefined,comments:false,inspector:false}); leavePresentation(); }
+ if(event.key==='Escape') { setMode('interact'); update({target:undefined,info:undefined,comments:false,inspector:false,compare:undefined}); leavePresentation(); }
  if(event.target instanceof HTMLElement && event.target.closest('input,textarea,select,[contenteditable],form')) return;
  if(event.key==='0') fit();
  const frame = state.workspace?.experiment.frames.find(frame => frame.id === state.selected);
@@ -136,6 +136,16 @@ export function applyPresence(actors: PresenceActor[]) {
   update({ workspace: { ...workspace, presence } });
 }
 
+export interface CompareGroup { name: string; control: Frame; variants: Frame[] }
+export function compareGroups(frames: Frame[]): CompareGroup[] {
+ const names = [...new Set(frames.filter(frame => frame.role).map(frame => frame.group ?? 'default'))];
+ return names.flatMap(name => {
+  const members = frames.filter(frame => (frame.group ?? 'default') === name);
+  const control = members.find(frame => frame.role === 'control');
+  const variants = members.filter(frame => frame.role === 'variant');
+  return control && variants.length ? [{ name, control, variants }] : [];
+ });
+}
 export function activeFeedback(): Feedback[] { return state.workspace?.feedback ?? []; }
 export async function initialize() {
  window.addEventListener('message',onMessage); window.addEventListener('hashchange',readRoute); window.addEventListener('keydown',onKey);

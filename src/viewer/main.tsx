@@ -10,7 +10,7 @@ import '@astryxdesign/core/astryx.css';
 import '@astryxdesign/theme-neutral/theme.css';
 import './style.css';
 import type { Frame, Position } from '../protocol';
-import { subscribe, snapshot, update, initialize, framePosition, iframes, setPosition, saveLayout, setLayout, fit, zoomBy, setMode, present, leavePresentation, syncBridge, mutate, refresh, discardLayoutConflict, activeClaim } from './store';
+import { subscribe, snapshot, update, initialize, framePosition, iframes, setPosition, saveLayout, setLayout, fit, zoomBy, setMode, present, leavePresentation, syncBridge, mutate, refresh, discardLayoutConflict, activeClaim, compareGroups } from './store';
 const PRODUCT_NAME = 'Draft';
 function useStore() { return useSyncExternalStore(subscribe,snapshot); }
 function startMove(event:PointerEvent<HTMLElement>, frame:Frame, resize = false) {
@@ -63,6 +63,8 @@ function FrameView({frame}:{frame:Frame}) {
  return <article className={`frame ${presenting?'presenting':''} ${state.selected===frame.id?'selected':''}${claim?' agent-active':''}`} style={{left:position.x,top:position.y,width:position.width,height:position.height+44,display:position.hidden&&!presenting?'none':undefined}} aria-label={frame.title} data-frame-id={frame.id} title={claim ? 'Agent está neste frame' : undefined}>
   <header className="frame-header" onPointerDown={event=>startMove(event,frame)}>
    <button className="frame-title" onClick={()=>update({selected:frame.id})}>{frame.title}</button>
+   {frame.state&&<span className="frame-badge frame-state" title="Estado do fluxo">{frame.state}</span>}
+   {frame.role&&<span className={`frame-badge frame-role-${frame.role}`} title={frame.group?`Grupo ${frame.group}`:undefined}>{frame.role==='control'?'Controle':'Variante'}</span>}
    {claim&&<span className="agent-pill" title="Agent está neste frame">Agent</span>}
    <ViewportControls frame={frame}/>
    <button className="icon-button" aria-label={`Informações de ${frame.title}`} title="Informações" onClick={()=>update({info:frame.id})}><InfoIcon/></button>
@@ -86,7 +88,34 @@ function Info() {
  const state=useStore(); if(!state.info) return null;
  const frame=state.workspace?.experiment.frames.find(frame=>frame.id===state.info);
  const readme=frame?.readme ?? (frame?'Sem README.md para este frame.':state.workspace?.readme || 'Adicione um README.md à pasta para dar contexto ao trabalho.');
- return <div className="scrim" onClick={()=>update({info:undefined})}><section role="dialog" aria-modal="true" aria-label="Informações" className="info-sheet" onClick={event=>event.stopPropagation()}><button className="close" aria-label="Fechar informações" onClick={()=>update({info:undefined})}><X/></button><p className="muted">{frame?'Sobre este protótipo':'Sobre este espaço'}</p><h1>{frame?.title ?? state.workspace?.experiment.title}</h1><Markdown source={readme}/>{frame&&<Button label="Apresentar protótipo" onClick={()=>present(frame.id)}/>}</section></div>;
+ return <div className="scrim" onClick={()=>update({info:undefined})}><section role="dialog" aria-modal="true" aria-label="Informações" className="info-sheet" onClick={event=>event.stopPropagation()}><button className="close" aria-label="Fechar informações" onClick={()=>update({info:undefined})}><X/></button><p className="muted">{frame?'Sobre este protótipo':'Sobre este espaço'}</p><h1>{frame?.title ?? state.workspace?.experiment.title}</h1>{!frame&&<DecisionSummary/>}{frame&&<FrameMeta frame={frame}/>}<Markdown source={readme}/>{frame&&<Button label="Apresentar protótipo" onClick={()=>present(frame.id)}/>}</section></div>;
+}
+function DecisionSummary() {
+ const decision=useStore().workspace?.experiment.decision;
+ if(!decision) return null;
+ return <dl className="decision">{decision.hypothesis&&<><dt>Hipótese</dt><dd>{decision.hypothesis}</dd></>}{decision.criteria&&<><dt>Critério de escolha</dt><dd>{decision.criteria}</dd></>}</dl>;
+}
+function FrameMeta({frame}:{frame:Frame}) {
+ if(!frame.state&&!frame.role&&!frame.tests&&!frame.signal) return null;
+ return <dl className="frame-meta">{frame.state&&<><dt>Estado</dt><dd>{frame.state}</dd></>}{frame.role&&<><dt>Papel</dt><dd>{frame.role==='control'?'Controle':'Variante'}{frame.group?` · ${frame.group}`:''}</dd></>}{frame.tests&&<><dt>O que este frame testa</dt><dd>{frame.tests}</dd></>}{frame.signal&&<><dt>Sinal pretendido</dt><dd><code>{frame.signal}</code></dd></>}</dl>;
+}
+function Compare() {
+ const state=useStore(); const workspace=state.workspace;
+ if(!state.compare||!workspace) return null;
+ const groups=compareGroups(workspace.experiment.frames);
+ const group=groups.find(candidate=>candidate.name===state.compare?.group)??groups[0];
+ if(!group) return null;
+ const variant=group.variants.find(frame=>frame.id===state.compare?.variant)??group.variants[0];
+ const decision=workspace.experiment.decision;
+ const close=()=>update({compare:undefined});
+ return <div className="scrim" onClick={close}><section role="dialog" aria-modal="true" aria-label="Comparar controle e variante" className="compare-sheet" onClick={event=>event.stopPropagation()}>
+  <header className="compare-header"><div><p className="muted">Controle e variante</p><h1>Comparar</h1></div>
+   {groups.length>1&&<label>Grupo<select value={group.name} onChange={event=>update({compare:{group:event.currentTarget.value}})}>{groups.map(candidate=><option key={candidate.name} value={candidate.name}>{candidate.name}</option>)}</select></label>}
+   <label>Variante<select value={variant.id} onChange={event=>update({compare:{group:group.name,variant:event.currentTarget.value}})}>{group.variants.map(frame=><option key={frame.id} value={frame.id}>{frame.title}</option>)}</select></label>
+   <button className="close" aria-label="Fechar comparação" onClick={close}><X/></button></header>
+  {(decision?.criteria||decision?.hypothesis)&&<dl className="decision compare-criteria">{decision.hypothesis&&<><dt>Hipótese</dt><dd>{decision.hypothesis}</dd></>}{decision.criteria&&<><dt>Critério de escolha</dt><dd>{decision.criteria}</dd></>}</dl>}
+  <div className="compare-panes">{([['Controle',group.control],['Variante',variant]] as const).map(([label,frame])=><figure key={label}><figcaption><span className="muted">{label}</span><strong>{frame.title}</strong>{frame.tests&&<p>{frame.tests}</p>}{frame.signal&&<code>{frame.signal}</code>}</figcaption><iframe key={frame.id} title={`${label}: ${frame.title}`} src={frame.url ?? `./content/${frame.entry}`} sandbox="allow-scripts" style={{width:frame.viewport.width,height:frame.viewport.height}}/></figure>)}</div>
+ </section></div>;
 }
 function InspectorPanel() {
  const state=useStore();
@@ -110,7 +139,7 @@ function App() {
  if(!workspace) return <main className="loading"><span className="brand">{PRODUCT_NAME}<span>✳</span></span><p>{state.error ?? 'Abrindo seu espaço…'}</p>{state.error&&<Button label="Tentar novamente" onClick={()=>void refresh()}/>}</main>;
  const hidden=workspace.experiment.frames.filter(frame=>framePosition(frame).hidden);
  return <main className={state.presenting?'app is-presenting':'app'}>
-  <header className="topbar"><div className="identity"><span className="brand">{PRODUCT_NAME}<span>✳</span></span><span className="divider"/><button className="workspace-title" onClick={()=>update({info:'workspace'})}>{workspace.experiment.title}<ChevronDown/></button></div><div className="topbar-end"><span className="save-state" role="status">{workspace.readOnly?'Somente leitura':state.busy?'Salvando…':''}</span>{!workspace.readOnly&&<button className="add-frame" onClick={()=>update({newFrame:true})}><Plus/>Adicionar protótipo</button>}<button className="feedback-toggle" onClick={()=>update({comments:!state.comments,inspector:false})}><MessageSquare/>Comentários <span>{workspace.feedback.filter(comment=>comment.status==='open').length}</span></button></div></header>
+  <header className="topbar"><div className="identity"><span className="brand">{PRODUCT_NAME}<span>✳</span></span><span className="divider"/><button className="workspace-title" onClick={()=>update({info:'workspace'})}>{workspace.experiment.title}<ChevronDown/></button></div><div className="topbar-end"><span className="save-state" role="status">{workspace.readOnly?'Somente leitura':state.busy?'Salvando…':''}</span>{!workspace.readOnly&&<button className="add-frame" onClick={()=>update({newFrame:true})}><Plus/>Adicionar protótipo</button>}{compareGroups(workspace.experiment.frames).length>0&&<button className="compare-toggle" onClick={()=>update({compare:{group:compareGroups(workspace.experiment.frames)[0].name}})}>Comparar</button>}<button className="feedback-toggle" onClick={()=>update({comments:!state.comments,inspector:false})}><MessageSquare/>Comentários <span>{workspace.feedback.filter(comment=>comment.status==='open').length}</span></button></div></header>
   <div className="canvas" style={{backgroundSize:`${24*state.layout.zoom}px ${24*state.layout.zoom}px`,backgroundPosition:`${state.layout.x}px ${state.layout.y}px`}} onPointerDown={startPan} onWheel={event=>{if(event.target!==event.currentTarget)return;if(event.ctrlKey||event.metaKey){event.preventDefault();zoomBy(event.deltaY>0?.94:1.06);}else setLayout({...state.layout,x:state.layout.x-event.deltaX,y:state.layout.y-event.deltaY});}}>
    <div className="world" style={{transform:state.presenting?'none':`translate(${state.layout.x}px,${state.layout.y}px) scale(${state.layout.zoom})`}}><FlowConnections/>{workspace.experiment.frames.map(frame=><FrameView key={frame.id} frame={frame}/>)}</div>
    {workspace.experiment.frames.length===0&&<div className="empty-canvas"><h1>Um espaço para suas ideias.</h1><p>Adicione protótipos para começar.</p></div>}
@@ -121,7 +150,7 @@ function App() {
   {state.mode==='element'&&<div className="mode-hint">Clique em um elemento para inspecionar.<button onClick={()=>setMode('interact')}>Concluir</button></div>}
   {state.mode==='comment'&&<div className="mode-hint">Arraste no protótipo para marcar uma região.<button onClick={()=>setMode('interact')}>Concluir</button></div>}
   {(state.error||workspace.diagnostics.length>0)&&<div className="notice" role="alert">{state.error ?? workspace.diagnostics.join(' · ')}{state.error&&<button onClick={()=>void discardLayoutConflict()}>Recarregar composição salva</button>}</div>}
-  <MiniMap/><ConnectionControls/><Info/><InspectorPanel/><Comments/><NewFrame/>
+  <MiniMap/><ConnectionControls/><Info/><InspectorPanel/><Comments/><NewFrame/><Compare/>
  </main>;
 }
 const root=document.getElementById('root'); if(root) createRoot(root).render(<App/>);

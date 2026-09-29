@@ -1,9 +1,9 @@
 import { useEffect, useSyncExternalStore, type FormEvent, type PointerEvent, type MouseEvent } from 'react';
-import type { Position } from '../protocol';
-import { snapshot, subscribe, setLayout, framePosition } from './store';
+import { edgeId, type Connection, type Edge, type Position } from '../protocol';
+import { snapshot, subscribe, setLayout, framePosition, mutate } from './store';
 import './flow-canvas.css';
 
-interface FlowState { open: boolean; source?: string; selected?: string; pointer?: { x: number; y: number } }
+interface FlowState { open: boolean; source?: string; selected?: string; pending?: Connection; pointer?: { x: number; y: number } }
 let flow: FlowState = { open: false };
 const listeners = new Set<() => void>();
 function flowSnapshot() { return flow; }
@@ -12,14 +12,15 @@ function changeFlow(change: Partial<FlowState>) { flow = { ...flow, ...change };
 function useFlow() { return useSyncExternalStore(subscribeFlow, flowSnapshot); }
 function cancelConnection(event: KeyboardEvent) { if (event.key === 'Escape') changeFlow({ source: undefined, pointer: undefined, open: false }); }
 function selectConnection(id: string) { if (!snapshot().workspace?.readOnly) changeFlow({ selected: id, open: true, source: undefined }); }
+function connections(): Connection[] { return (snapshot().workspace?.experiment.edges ?? []).map(edge => ({ ...edge, id: edgeId(edge) })); }
+function saveEdges(edges: Edge[]) { return mutate('edges', { edges: edges.map(({ from, to, label }) => ({ from, to, label })) }); }
 function connectFrames(from: string, to: string) {
  if (from === to || snapshot().workspace?.readOnly) return;
- const { layout } = snapshot();
- const existing = layout.connections?.find(connection => connection.from === from && connection.to === to);
+ const existing = connections().find(connection => connection.from === from && connection.to === to);
  if (existing) { selectConnection(existing.id); return; }
- const connection = { id: crypto.randomUUID(), from, to, label: '' };
- setLayout({ ...layout, connections: [...(layout.connections ?? []), connection] });
- changeFlow({ source: undefined, pointer: undefined, selected: connection.id, open: true });
+ const edge = { from, to, label: '' };
+ changeFlow({ source: undefined, pointer: undefined, selected: edgeId(edge), pending: { ...edge, id: edgeId(edge) }, open: true });
+ void saveEdges([...connections(), edge]);
 }
 function clickConnector(frameId: string) {
  if (!flow.source) { changeFlow({ source: frameId, selected: undefined, open: true }); return; }
@@ -70,7 +71,7 @@ function curve(from: Position, to: Position | { x: number; y: number }) {
 export function FlowConnections() {
  const state = useSyncExternalStore(subscribe, snapshot), current = useFlow();
  if (state.presenting) return null;
- return <svg className="flow-connections" aria-label="Conexões entre protótipos"><defs><marker id="flow-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M1 1 7 4 1 7" fill="none" stroke="currentColor" strokeWidth="1.4"/></marker></defs>{(state.layout.connections ?? []).map(connection => {
+ return <svg className="flow-connections" aria-label="Conexões entre protótipos"><defs><marker id="flow-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M1 1 7 4 1 7" fill="none" stroke="currentColor" strokeWidth="1.4"/></marker></defs>{(state.workspace?.experiment.edges ?? []).map(edge => ({ ...edge, id: edgeId(edge) })).map(connection => {
   const from = state.layout.frames[connection.from], to = state.layout.frames[connection.to];
   if (!from || !to || from.hidden || to.hidden) return null;
   const geometry = curve(from, to);
@@ -81,19 +82,19 @@ function saveConnection(event: FormEvent<HTMLFormElement>) {
  event.preventDefault();
  const fields = new FormData(event.currentTarget), from = fields.get('from'), to = fields.get('to'), label = fields.get('label');
  if (typeof from !== 'string' || typeof to !== 'string' || typeof label !== 'string' || from === to) return;
- const { layout } = snapshot();
- const connection = { id: flow.selected ?? crypto.randomUUID(), from, to, label: label.trim() };
- setLayout({ ...layout, connections: [...(layout.connections ?? []).filter(saved => saved.id !== connection.id), connection] });
- changeFlow({ selected: connection.id, source: undefined, open: false });
+ const edge = { from, to, label: label.trim() };
+ const others = connections().filter(saved => saved.id !== flow.selected && saved.id !== edgeId(edge));
+ void saveEdges([...others, edge]);
+ changeFlow({ selected: edgeId(edge), source: undefined, open: false });
 }
-function removeConnection() { const { layout } = snapshot(); setLayout({ ...layout, connections: (layout.connections ?? []).filter(connection => connection.id !== flow.selected) }); changeFlow({ selected: undefined, open: false }); }
+function removeConnection() { void saveEdges(connections().filter(connection => connection.id !== flow.selected)); changeFlow({ selected: undefined, open: false }); }
 export function ConnectionControls() {
  const state = useSyncExternalStore(subscribe, snapshot), current = useFlow();
  useEffect(() => { window.addEventListener('keydown', cancelConnection); return () => window.removeEventListener('keydown', cancelConnection); }, []);
  const frames = state.workspace?.experiment.frames.filter(frame => !framePosition(frame).hidden) ?? [];
- const selected = state.layout.connections?.find(connection => connection.id === current.selected);
+ const selected = (state.workspace?.experiment.edges ?? []).map(edge => ({ ...edge, id: edgeId(edge) })).find(connection => connection.id === current.selected) ?? (current.pending?.id === current.selected ? current.pending : undefined);
  if (state.presenting || state.workspace?.readOnly) return null;
- return current.open ? <section className="connection-panel" aria-label="Editar conexão"><header><strong>{selected ? 'Editar conexão' : 'Conectar protótipos'}</strong><button aria-label="Fechar conexões" onClick={() => changeFlow({ open: false, source: undefined })}>×</button></header><p>{current.source ? 'Clique na seta de outro protótipo para conectar. Esc cancela.' : 'Arraste a seta lateral até outro protótipo, ou escolha abaixo.'}</p>{frames.length < 2 ? <p>Adicione outro protótipo para criar um fluxo.</p> : <form key={`${selected?.id ?? 'new'}-${current.source ?? ''}`} onSubmit={saveConnection}><label>Origem<select name="from" defaultValue={selected?.from ?? current.source ?? frames[0]?.id}>{frames.map(frame => <option key={frame.id} value={frame.id}>{frame.title}</option>)}</select></label><label>Destino<select name="to" defaultValue={selected?.to ?? frames.find(frame => frame.id !== (current.source ?? frames[0]?.id))?.id}>{frames.map(frame => <option key={frame.id} value={frame.id}>{frame.title}</option>)}</select></label><label>Rótulo<input name="label" maxLength={160} defaultValue={selected?.label ?? ''} placeholder="Ex.: após confirmar"/></label><footer>{selected && <button type="button" onClick={removeConnection}>Remover</button>}<button className="primary" type="submit">{selected ? 'Salvar conexão' : 'Criar conexão'}</button></footer></form>}</section> : null;
+ return current.open ? <section className="connection-panel" aria-label="Editar conexão"><header><strong>{selected ? 'Editar conexão' : 'Conectar protótipos'}</strong><button aria-label="Fechar conexões" onClick={() => changeFlow({ open: false, source: undefined })}>×</button></header><p>{current.source ? 'Clique na seta de outro protótipo para conectar. Esc cancela.' : 'Arraste a seta lateral até outro protótipo, ou escolha abaixo.'}</p>{frames.length < 2 ? <p>Adicione outro protótipo para criar um fluxo.</p> : <form key={`${current.selected ?? 'new'}-${current.source ?? ''}`} onSubmit={saveConnection}><label>Origem<select name="from" defaultValue={selected?.from ?? current.source ?? frames[0]?.id}>{frames.map(frame => <option key={frame.id} value={frame.id}>{frame.title}</option>)}</select></label><label>Destino<select name="to" defaultValue={selected?.to ?? frames.find(frame => frame.id !== (current.source ?? frames[0]?.id))?.id}>{frames.map(frame => <option key={frame.id} value={frame.id}>{frame.title}</option>)}</select></label><label>Rótulo<input name="label" maxLength={160} defaultValue={selected?.label ?? ''} placeholder="Ex.: após confirmar"/></label><footer>{selected && <button type="button" onClick={removeConnection}>Remover</button>}<button className="primary" type="submit">{selected ? 'Salvar conexão' : 'Criar conexão'}</button></footer></form>}</section> : null;
 }
 function centerMap(event: MouseEvent<SVGSVGElement>, left: number, top: number, width: number, height: number) {
  const bounds = event.currentTarget.getBoundingClientRect();

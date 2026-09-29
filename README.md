@@ -61,6 +61,30 @@ Ask any agent: *“Start Draft for this folder.”*
 
 Save as `experiment.json` next to `frames/`.
 
+### Flows, states and decisions (`schemaVersion: 2`)
+
+Everything that matters for the study lives in the manifest, so it travels with Git:
+
+```json
+{
+  "schemaVersion": 2,
+  "decision": { "hypothesis": "One text at a time increases completed reads.", "criteria": "More completed reads per session." },
+  "frames": [
+    { "id": "checkout", "title": "Checkout", "entry": "frames/checkout/index.html", "viewport": { "width": 390, "height": 620 },
+      "state": "ready", "role": "control", "group": "checkout", "tests": "Current layout.", "signal": "checkout_completed" },
+    { "id": "checkout-error", "title": "Card declined", "entry": "frames/checkout-error/index.html", "viewport": { "width": 390, "height": 620 },
+      "state": "error" }
+  ],
+  "edges": [{ "from": "checkout", "to": "checkout-error", "label": "card declined" }]
+}
+```
+
+- `state` — any short name (empty, loading, error, success…). Shown as a badge on the frame.
+- `role` — `control` or `variant`, per `group`. When a group has a control and a variant, **Comparar** shows them side by side with the decision criteria.
+- `edges` — the flow drawn on the canvas. Connections you draw in the viewer are saved here. Older folders that kept them in `.draft/layout.json` are migrated on open.
+- `draft create <folder> "Title" --flow` starts with empty → loading → success / error states already linked.
+- Manifests without `schemaVersion` still open unchanged; the first write from Draft adds `schemaVersion: 2`. Fields Draft does not know are preserved.
+
 ## Limits
 
 - Classic HTML, CSS, and local scripts in sandboxed iframes (`allow-scripts` only).
