@@ -81,7 +81,7 @@ export async function startRuntime(folder: string, port = 4173) {
   });
   try { viewerOrigin = await listen(viewer, port); } catch (error) { content.close(); throw error; }
   let timer: ReturnType<typeof setTimeout> | undefined; const changed = new Set<string>();
-  const watcher = watch(store.root, { recursive: true }, (_event, filename) => { if (!filename || filename.includes('.tmp')) return; changed.add(filename); clearTimeout(timer); timer = setTimeout(async () => {
+  const watcher = watch(store.root, { recursive: true }, (_event, name) => { if (!name) return; const filename = name.split(path.sep).join('/').replace(/\.[0-9a-f-]{36}\.tmp$/, ''); if (filename.endsWith('.tmp')) return; changed.add(filename); clearTimeout(timer); timer = setTimeout(async () => {
     const files = [...changed]; changed.clear();
     const workspace = await store.snapshot();
     const frameIds = workspace.experiment.frames.filter(frame => files.some(file => file === frame.entry || file.startsWith(`${path.dirname(frame.entry)}/`) || !workspace.experiment.frames.some(candidate => file.startsWith(`${path.dirname(candidate.entry)}/`)))).map(frame => frame.id);

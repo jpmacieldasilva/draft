@@ -2,7 +2,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { readFile, realpath, mkdir, writeFile, rename, appendFile, cp, access, lstat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import type { Experiment, Frame, Feedback, Layout, Target, Workspace, VisualEdit, Connection, PresenceActor, PresenceState } from '../protocol.js';
-import { applyEdit, captureBaseline, revertBaseline, type EditBaseline } from './prototype-writer.js';
+import { applyEdit, isBaseline, mergeBaseline, revertBaseline, stylesheetsOf, type EditBaseline } from './prototype-writer.js';
 
 export class RequestError extends Error { constructor(message: string, public status = 400) { super(message); } }
 export function record(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
@@ -18,7 +18,34 @@ export async function confined(root: string, relative: string): Promise<string> 
 async function optionalText(root: string, relative: string) { try { return await readFile(await confined(root, relative), 'utf8'); } catch { return ''; } }
 const STATE_DIR = '.draft';
 const LEGACY_STATE_DIR = '.draftroom';
+const STATE_FILES = ['feedback.jsonl', 'layout.json', 'presence.json', 'edits.json'];
 async function readStateFile(root: string, filename: string) { const primary = await optionalText(root, `${STATE_DIR}/${filename}`); return primary || await optionalText(root, `${LEGACY_STATE_DIR}/${filename}`); }
+export function escapeHtml(value: string) { return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+async function exists(file: string) { try { await access(file); return true; } catch { return false; } }
+/** Copies legacy `.draftroom/` state into `.draft/` once; feedback logs are merged by eventId so nothing written by older versions is hidden. */
+async function migrateLegacyState(root: string) {
+  const legacy = path.join(root, LEGACY_STATE_DIR);
+  if (!(await exists(legacy)) || (await lstat(legacy)).isSymbolicLink()) return;
+  for (const filename of STATE_FILES) {
+    const source = path.join(legacy, filename);
+    if (!(await exists(source)) || !(await lstat(source)).isFile()) continue;
+    const primaryDirectory = path.join(root, STATE_DIR);
+    await mkdir(primaryDirectory, { recursive: true });
+    if ((await lstat(primaryDirectory)).isSymbolicLink()) throw new RequestError('A pasta de estado não pode ser um symlink.', 403);
+    const destination = path.join(primaryDirectory, filename);
+    const legacyText = await readFile(source, 'utf8');
+    if (!(await exists(destination))) { await writeFile(destination, legacyText, { flag: 'wx' }).catch(() => {}); continue; }
+    if (filename !== 'feedback.jsonl') continue;
+    const current = await readFile(destination, 'utf8');
+    const seen = new Set<string>(); const lines: string[] = [];
+    for (const line of [...legacyText.split('\n'), ...current.split('\n')].filter(Boolean)) {
+      let key = line; try { const parsed: unknown = JSON.parse(line); if (record(parsed) && typeof parsed.eventId === 'string') key = parsed.eventId; } catch { /* keep raw line */ }
+      if (seen.has(key)) continue; seen.add(key); lines.push(line);
+    }
+    const merged = `${lines.join('\n')}\n`;
+    if (merged !== current) { const temporary = `${destination}.${randomUUID()}.tmp`; await writeFile(temporary, merged, { flag: 'wx' }); await rename(temporary, destination); }
+  }
+}
 function validViewport(value: unknown): value is Record<string, unknown> & { width: number; height: number } { return record(value) && typeof value.width === 'number' && typeof value.height === 'number' && value.width >= 160 && value.width <= 4000 && value.height >= 120 && value.height <= 4000; }
 function parseExperiment(value: unknown): Experiment {
   if (!record(value) || !Array.isArray(value.frames)) throw new RequestError('experiment.json precisa conter frames.');
@@ -59,13 +86,14 @@ export async function discoverExperiment(root: string): Promise<WorkspaceDiscove
     throw new RequestError('A pasta precisa conter experiment.json ou index.html.');
   }
 }
+export function frameHtml(title: string, body: string) { const safe = escapeHtml(title); return `<!doctype html>\n<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${safe}</title></head><body><main><h1>${safe}</h1><p>${escapeHtml(body)}</p></main></body></html>\n`; }
 export async function createWorkspace(folder: string, title = 'Meu espaço'): Promise<string> {
   const destination = path.resolve(folder);
   try { await access(destination); throw new RequestError('A pasta de destino já existe. Escolha outro nome.'); } catch (error) { if (error instanceof RequestError) throw error; }
   await mkdir(path.join(destination, 'frames/main'), { recursive: true });
   await writeFile(path.join(destination, 'experiment.json'), `${JSON.stringify({ id: 'workspace', title, frames: [{ id: 'main', title: 'Primeiro protótipo', entry: 'frames/main/index.html', viewport: { width: 390, height: 620 } }] }, null, 2)}\n`, { flag: 'wx' });
   await writeFile(path.join(destination, 'README.md'), `# ${title}\n\nDescreva aqui o que você está explorando.\n`, { flag: 'wx' });
-  await writeFile(path.join(destination, 'frames/main/index.html'), '<!doctype html>\n<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Primeiro protótipo</title></head><body><main><h1>Primeiro protótipo</h1><p>Comece a explorar esta ideia.</p></main></body></html>\n', { flag: 'wx' });
+  await writeFile(path.join(destination, 'frames/main/index.html'), frameHtml('Primeiro protótipo', 'Comece a explorar esta ideia.'), { flag: 'wx' });
   await writeFile(path.join(destination, 'frames/main/README.md'), '# Primeiro protótipo\n\nDescreva a intenção desta alternativa.\n', { flag: 'wx' });
   return realpath(destination);
 }
@@ -110,13 +138,20 @@ export class WorkspaceStore {
   contentOrigin = '';
   private queue: Promise<unknown> = Promise.resolve();
   private migratedEdits = false;
+  private migratedState = false;
   constructor(public root: string) {}
-  async initialize() { this.root = await realpath(this.root); await this.migrateLegacyEdits(); await this.snapshot(); }
+  async initialize() { this.root = await realpath(this.root); await this.migrateState(); await this.migrateLegacyEdits(); await this.snapshot(); }
+  private async migrateState() { if (this.migratedState) return; this.migratedState = true; this.root = await realpath(this.root); await migrateLegacyState(this.root); }
+  private async sharedSheets(experiment: Experiment, frameId: string) {
+    const shared = new Set<string>();
+    for (const frame of experiment.frames) if (frame.id !== frameId) for (const sheet of await stylesheetsOf(this.root, frame)) shared.add(sheet);
+    return shared;
+  }
   private baselineKey(frameId: string, selector: string) { return `${frameId}:${selector}`; }
   private async loadBaselines(): Promise<Record<string, EditBaseline>> {
     const source = await readStateFile(this.root, 'baselines.json');
     if (!source) return {};
-    try { const parsed: unknown = JSON.parse(source); return record(parsed) ? parsed as Record<string, EditBaseline> : {}; } catch { return {}; }
+    try { const parsed: unknown = JSON.parse(source); return record(parsed) ? Object.fromEntries(Object.entries(parsed).filter(([, value]) => isBaseline(value))) as Record<string, EditBaseline> : {}; } catch { return {}; }
   }
   private async saveBaselines(baselines: Record<string, EditBaseline>) {
     await this.stateDirectory();
@@ -134,7 +169,7 @@ export class WorkspaceStore {
       try {
         const edit = validateEdit(entry);
         const frame = experiment.frames.find(candidate => candidate.id === edit.frameId);
-        if (frame) await applyEdit(this.root, frame, edit);
+        if (frame) await applyEdit(this.root, frame, edit, await this.sharedSheets(experiment, frame.id));
       } catch { /* ignore invalid legacy edits */ }
     }
     for (const relative of [`${STATE_DIR}/edits.json`, `${LEGACY_STATE_DIR}/edits.json`]) {
@@ -143,6 +178,7 @@ export class WorkspaceStore {
   }
   async snapshot(): Promise<Workspace> {
     this.root = await realpath(this.root);
+    await this.migrateState();
     await this.migrateLegacyEdits();
     const diagnostics: string[] = [];
     let experiment: Experiment = { id: 'invalid', title: path.basename(this.root), frames: [] };
@@ -177,16 +213,17 @@ export class WorkspaceStore {
     if(body.remove===true){
       const baseline=baselines[key];
       if(!baseline)throw new RequestError('Nenhum ajuste salvo para restaurar.',404);
-      await revertBaseline(this.root,baseline);
+      await revertBaseline(this.root,frame,baseline);
       delete baselines[key];
       await this.saveBaselines(baselines);
       return;
     }
-    if(!baselines[key])baselines[key]=await captureBaseline(this.root,frame,edit.selector);
-    await applyEdit(this.root,frame,edit);
+    const applied=await applyEdit(this.root,frame,edit,await this.sharedSheets(workspace.experiment,frame.id));
+    baselines[key]=mergeBaseline(edit.frameId,edit.selector,baselines[key],applied);
     await this.saveBaselines(baselines);
   });}
   feedback(body: Record<string, unknown>, id?: string) { return this.mutate(async () => {
+    await this.migrateState();
     const workspace = await this.snapshot(); const previous = workspace.feedback.find(feedback => feedback.id === id);
     if (id && !previous) throw new RequestError('Comentário não encontrado.', 404);
     if (id && !['open', 'resolved'].includes(String(body.status))) throw new RequestError('Estado inválido.');
@@ -221,31 +258,13 @@ export class WorkspaceStore {
     const frameDirectory = path.join(framesDirectory, frameId);
     await mkdir(frameDirectory, { recursive: false });
     const entry = `frames/${frameId}/index.html`;
-    await writeFile(path.join(frameDirectory, 'index.html'), `<!doctype html>\n<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${trimmedTitle}</title></head><body><main><h1>${trimmedTitle}</h1><p>Comece a explorar esta alternativa.</p></main></body></html>\n`, { flag: 'wx' });
+    await writeFile(path.join(frameDirectory, 'index.html'), frameHtml(trimmedTitle, 'Comece a explorar esta alternativa.'), { flag: 'wx' });
     await writeFile(path.join(frameDirectory, 'README.md'), `# ${trimmedTitle}\n\nDescreva a intenção desta alternativa.\n`, { flag: 'wx' });
     experiment.frames.push({ id: frameId, title: trimmedTitle, entry, viewport: { width: 390, height: 844 } });
     await this.atomic('experiment.json', { ...(record(raw) ? raw : {}), frames: experiment.frames });
   }); }
-  private async resolvePresenceDirectory(): Promise<string> {
-    try {
-      const s = await lstat(path.join(this.root, `${STATE_DIR}/presence.json`));
-      if (s.isFile()) return STATE_DIR;
-    } catch {}
-    try {
-      const s = await lstat(path.join(this.root, `${LEGACY_STATE_DIR}/presence.json`));
-      if (s.isFile()) return LEGACY_STATE_DIR;
-    } catch {}
-    try {
-      const s = await lstat(path.join(this.root, STATE_DIR));
-      if (s.isDirectory() && !s.isSymbolicLink()) return STATE_DIR;
-    } catch {}
-    try {
-      const s = await lstat(path.join(this.root, LEGACY_STATE_DIR));
-      if (s.isDirectory() && !s.isSymbolicLink()) return LEGACY_STATE_DIR;
-    } catch {}
-    return LEGACY_STATE_DIR;
-  }
   async loadPresence(includeExpired = false): Promise<PresenceState> {
+    await this.migrateState();
     const source = await readStateFile(this.root, 'presence.json');
     if (!source) return { actors: [] };
     try {
@@ -275,12 +294,8 @@ export class WorkspaceStore {
     }
   }
   async savePresence(state: PresenceState): Promise<void> {
-    const dir = await this.resolvePresenceDirectory();
-    const directory = path.join(this.root, dir);
-    await mkdir(directory, { recursive: true });
-    if ((await lstat(directory)).isSymbolicLink()) throw new RequestError('A pasta de estado não pode ser um symlink.', 403);
-    await confined(this.root, dir);
-    await this.atomic(`${dir}/presence.json`, state);
+    await this.stateDirectory();
+    await this.atomic(`${STATE_DIR}/presence.json`, state);
   }
   private mutatePresence(operation: (current: PresenceState) => Promise<PresenceState> | PresenceState): Promise<PresenceState> {
     const result = this.queue.then(async () => {
