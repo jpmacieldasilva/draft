@@ -1,13 +1,14 @@
+import { normalizeLocale, setLocale, t, DEFAULT_LOCALE } from '../i18n';
 import type { Feedback, Frame, Layout, Position, PresenceActor, Target, Workspace } from '../protocol';
 declare global { interface Window { __DRAFTROOM__?: Workspace } }
 export type Mode = 'interact' | 'element' | 'comment';
-interface State { workspace?: Workspace; layout: Layout; mode: Mode; selected?: string; presenting?: string; info?: string; target?: {frameId: string; target: Target}; feedback?: string; error?: string; busy: boolean; comments: boolean; inspector: boolean; newFrame?: boolean }
+interface State { workspace?: Workspace; layout: Layout; mode: Mode; selected?: string; presenting?: string; info?: string; target?: {frameId: string; target: Target}; feedback?: string; error?: string; busy: boolean; comments: boolean; inspector: boolean; newFrame?: boolean; notice?: string; compare?: { group: string; variant?: string }; blocked: Record<string, string[]> }
 const listeners = new Set<() => void>();
 let layoutDirty = false;
 let layoutRevision = '';
 let layoutVersion = 0;
 let layoutSaving = false;
-let state: State = { layout: { frames: {}, zoom: .65, x: 80, y: 120 }, mode: 'interact', busy: false, comments: false, inspector: false };
+let state: State = { layout: { frames: {}, zoom: .65, x: 80, y: 120 }, mode: 'interact', busy: false, comments: false, inspector: false, blocked: {} };
 export const iframes = new Map<string, HTMLIFrameElement>();
 export function subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 export function snapshot() { return state; }
@@ -18,6 +19,8 @@ function initialLayout(workspace: Workspace): Layout {
  return workspace.layout ?? {zoom: .65, x: 72, y: 130, frames: Object.fromEntries(workspace.experiment.frames.map(frame => { const position = {...frame.viewport, x, y: 0}; x += frame.viewport.width + 64; return [frame.id, position]; }))};
 }
 export function acceptWorkspace(workspace: Workspace, first = false) {
+ const locale = normalizeLocale(workspace.locale) ?? DEFAULT_LOCALE;
+ setLocale(locale); document.documentElement.lang = locale;
  if (first || !layoutDirty) layoutRevision = workspace.revision;
  const layout = first || !layoutDirty ? initialLayout(workspace) : state.layout;
  let nextX = Math.max(0, ...Object.values(layout.frames).map(position => position.x + position.width + 64));
@@ -28,8 +31,8 @@ export function acceptWorkspace(workspace: Workspace, first = false) {
 }
 export async function discardLayoutConflict() { layoutDirty = false; await refresh(); }
 export async function refresh() {
- try { const response = await fetch('./api/workspace'); if (!response.ok) throw new Error('Não foi possível abrir a pasta.'); acceptWorkspace(await response.json(), !state.workspace); }
- catch (error) { update({error: error instanceof Error ? error.message : 'Falha ao carregar workspace.', busy: false}); }
+ try { const response = await fetch('./api/workspace'); if (!response.ok) throw new Error(t('error.open')); acceptWorkspace(await response.json(), !state.workspace); }
+ catch (error) { update({error: error instanceof Error ? error.message : t('error.load'), busy: false}); }
 }
 export async function mutate(path: string, body: unknown) {
  if (state.workspace?.readOnly) return;
@@ -37,9 +40,9 @@ export async function mutate(path: string, body: unknown) {
  try {
   const response = await fetch(`./api/${path}`, {method:'POST',headers:{'Content-Type':'application/json','X-Draft-Token':state.workspace?.token ?? ''},body:JSON.stringify(body)});
   const result = await response.json();
-  if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Não foi possível salvar.');
+  if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : t('error.save'));
   acceptWorkspace(result);
- } catch(error) { update({busy:false,error:error instanceof Error ? error.message : 'Não foi possível salvar.'}); }
+ } catch(error) { update({busy:false,error:error instanceof Error ? error.message : t('error.save')}); }
 }
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 export function saveLayout() {
@@ -54,12 +57,12 @@ async function persistLayout() {
  try {
   const response=await fetch('./api/layout',{method:'POST',headers:{'Content-Type':'application/json','X-Draft-Token':state.workspace?.token??''},body:JSON.stringify({layout:state.layout,revision:layoutRevision})});
   const result=await response.json();
-  if(!response.ok) throw new Error(typeof result.error==='string'?result.error:'Não foi possível salvar a composição.');
+  if(!response.ok) throw new Error(typeof result.error==='string'?result.error:t('error.saveLayout'));
   layoutRevision=result.revision;
   layoutDirty=version!==layoutVersion;
   acceptWorkspace(result);
   if(layoutDirty)saveLayout();
- } catch(error) {update({busy:false,error:error instanceof Error?error.message:'Não foi possível salvar a composição.'});}
+ } catch(error) {update({busy:false,error:error instanceof Error?error.message:t('error.saveLayout')});}
  finally {layoutSaving=false;}
 }
 export function setLayout(layout: Layout, save = true) { layoutDirty = true; layoutVersion++; update({layout}); if(save) saveLayout(); }
@@ -84,15 +87,43 @@ export function syncBridge(frameId: string) {
  const frame=iframes.get(frameId)?.contentWindow;
  frame?.postMessage({type:'draftroom:mode',mode:state.mode}, '*');
 }
-export function present(frameId: string) { update({presenting:frameId, selected:frameId, info:undefined}); location.hash = `frame/${encodeURIComponent(frameId)}`; }
+let trail: string[] = [];
+export function present(frameId: string, fromFlow = false) { if(!fromFlow) trail = []; update({presenting:frameId, selected:frameId, info:undefined}); location.hash = `frame/${encodeURIComponent(frameId)}`; }
+export function nextSteps(frameId: string) { return (state.workspace?.experiment.edges ?? []).filter(edge => edge.from === frameId && state.workspace?.experiment.frames.some(frame => frame.id === edge.to)); }
+export function followFlow(frameId: string) { if(state.presenting && state.presenting !== frameId) trail.push(state.presenting); present(frameId, true); }
+function flowBack() { const previous = trail.pop(); if(previous) present(previous, true); }
+function presentationKey(key: string) {
+ if(!state.presenting) return false;
+ if(key==='ArrowRight') { const next = nextSteps(state.presenting)[0]; if(next) followFlow(next.to); return true; }
+ if(key==='ArrowLeft') { flowBack(); return true; }
+ return false;
+}
+function centerOn(frameId: string) {
+ const frame = state.workspace?.experiment.frames.find(candidate => candidate.id === frameId); if(!frame) return;
+ const position = framePosition(frame), zoom = state.layout.zoom;
+ setLayout({...state.layout, x: innerWidth/2 - (position.x + position.width/2)*zoom, y: innerHeight/2 - (position.y + (position.height+44)/2)*zoom}, false);
+}
+function goto(frameId: string) {
+ if(!state.workspace?.experiment.frames.some(frame => frame.id === frameId)) { update({notice:t('notice.gotoMissing',{id:frameId})}); return; }
+ update({notice:undefined});
+ if(state.presenting) followFlow(frameId);
+ else { update({selected:frameId}); centerOn(frameId); }
+}
 export function leavePresentation() { update({presenting:undefined}); history.replaceState(null,'',`${location.pathname}${location.search}`); if(document.fullscreenElement) void document.exitFullscreen(); }
 export function readRoute() { const id = location.hash.startsWith('#frame/') ? decodeURIComponent(location.hash.slice(7)) : undefined; update({presenting:state.workspace?.experiment.frames.some(frame=>frame.id===id) ? id : undefined}); }
 export function selectInspectTarget(frameId: string, target: Target) {
  update({ target: { frameId, target }, selected: frameId, inspector: true, comments: false, feedback: undefined });
+ shareSelection(frameId, target);
 }
 export function selectCommentTarget(frameId: string, target: Target) {
  update({ target: { frameId, target }, selected: frameId, comments: true, inspector: false, feedback: undefined });
+ shareSelection(frameId, target);
 }
+function shareSelection(frameId: string, target: Target) {
+ if(state.workspace?.readOnly) return;
+ void fetch('./api/selection',{method:'POST',headers:{'Content-Type':'application/json','X-Draft-Token':state.workspace?.token ?? ''},body:JSON.stringify({frameId,target})}).catch(()=>undefined);
+}
+function blockedHost(uri: string) { try { return new URL(uri).host || uri; } catch { return uri.slice(0, 200); } }
 function isTarget(value: unknown): value is Target {
  if(!value || typeof value !== 'object' || !('kind' in value) || !('rect' in value) || !('label' in value)) return false;
  if(value.kind !== 'element' && value.kind !== 'region' || typeof value.label !== 'string' || value.label.length > 500) return false;
@@ -104,6 +135,12 @@ function onMessage(event:MessageEvent<unknown>) {
  if(!frame || !event.data || typeof event.data !== 'object' || !('type' in event.data)) return;
  if(event.data.type==='draftroom:ready') syncBridge(frame[0]);
  if(event.data.type==='draftroom:escape') { setMode('interact'); leavePresentation(); }
+ if(event.data.type==='draftroom:goto' && 'frameId' in event.data && typeof event.data.frameId==='string' && state.mode==='interact') goto(event.data.frameId);
+ if(event.data.type==='draftroom:blocked' && 'uri' in event.data && typeof event.data.uri==='string') {
+  const host = blockedHost(event.data.uri), known = state.blocked[frame[0]] ?? [];
+  if(!known.includes(host) && known.length < 20) update({blocked:{...state.blocked,[frame[0]]:[...known,host]}});
+ }
+ if(event.data.type==='draftroom:key' && 'key' in event.data && typeof event.data.key==='string') presentationKey(event.data.key);
  if(event.data.type==='draftroom:selection' && 'target' in event.data && isTarget(event.data.target)) {
   const target = event.data.target;
   if(state.mode==='element' && target.kind==='element') selectInspectTarget(frame[0], target);
@@ -111,8 +148,9 @@ function onMessage(event:MessageEvent<unknown>) {
  }
 }
 function onKey(event:KeyboardEvent) {
- if(event.key==='Escape') { setMode('interact'); update({target:undefined,info:undefined,comments:false,inspector:false}); leavePresentation(); }
+ if(event.key==='Escape') { setMode('interact'); update({target:undefined,info:undefined,comments:false,inspector:false,compare:undefined}); leavePresentation(); }
  if(event.target instanceof HTMLElement && event.target.closest('input,textarea,select,[contenteditable],form')) return;
+ if(presentationKey(event.key)) { event.preventDefault(); return; }
  if(event.key==='0') fit();
  const frame = state.workspace?.experiment.frames.find(frame => frame.id === state.selected);
  if (frame && event.key === 'Enter') present(frame.id);
@@ -136,6 +174,16 @@ export function applyPresence(actors: PresenceActor[]) {
   update({ workspace: { ...workspace, presence } });
 }
 
+export interface CompareGroup { name: string; control: Frame; variants: Frame[] }
+export function compareGroups(frames: Frame[]): CompareGroup[] {
+ const names = [...new Set(frames.filter(frame => frame.role).map(frame => frame.group ?? 'default'))];
+ return names.flatMap(name => {
+  const members = frames.filter(frame => (frame.group ?? 'default') === name);
+  const control = members.find(frame => frame.role === 'control');
+  const variants = members.filter(frame => frame.role === 'variant');
+  return control && variants.length ? [{ name, control, variants }] : [];
+ });
+}
 export function activeFeedback(): Feedback[] { return state.workspace?.feedback ?? []; }
 export async function initialize() {
  window.addEventListener('message',onMessage); window.addEventListener('hashchange',readRoute); window.addEventListener('keydown',onKey);
@@ -144,7 +192,7 @@ export async function initialize() {
  const events = new EventSource('./api/events');
  events.onmessage = event => { try {
   const payload: {type:string;frameIds?:string[];actors?:PresenceActor[]} = JSON.parse(event.data);
-  if(payload.type==='reload') payload.frameIds?.forEach(id => { const iframe=iframes.get(id); if(iframe) { const url=new URL(iframe.src); url.searchParams.set('_reload',String(Date.now())); iframe.src=url.href; } });
+  if(payload.type==='reload') payload.frameIds?.forEach(id => { if(state.blocked[id]) { const { [id]: _cleared, ...rest } = state.blocked; update({blocked:rest}); } const iframe=iframes.get(id); if(iframe) { const url=new URL(iframe.src); url.searchParams.set('_reload',String(Date.now())); iframe.src=url.href; } });
   if(payload.type==='workspace') void refresh();
   if(payload.type==='presence' && Array.isArray(payload.actors)) applyPresence(payload.actors);
  } catch { /* Ignore malformed stream messages. */ } };

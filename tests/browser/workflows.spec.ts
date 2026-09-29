@@ -1,25 +1,14 @@
-import { test, expect } from '@playwright/test';
-import { mkdtemp, cp, readFile, writeFile, rm, mkdir } from 'node:fs/promises';
+import { test, expect } from './harness';
+import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 
 const stateDir = (folder: string) => path.join(folder, '.draft');
 let folder = '';
 let url = '';
-let server: ChildProcess;
-test.beforeEach(async () => {
- folder = await mkdtemp(path.join(tmpdir(), 'draft-browser-'));
- await cp('examples/studio', folder, {recursive:true,filter:source=>!source.split(path.sep).some(segment=>segment==='.draftroom'||segment==='.draft')});
- server = spawn(process.execPath, ['dist/runtime/cli.js','open',folder], {env:{...process.env,DRAFT_PORT:'0'},stdio:['ignore','pipe','pipe']});
- url = await new Promise<string>((resolve,reject) => {
-  server.stdout?.on('data', (chunk:Buffer) => {const match = chunk.toString().match(/http:\/\/127\.0\.0\.1:\d+/);if(match)resolve(match[0]);});
-  server.once('exit', code => reject(new Error(`Runtime encerrou: ${code}`)));
-  server.once('error', reject);
- });
-});
-test.afterEach(async()=>{server?.kill('SIGTERM');await rm(folder,{recursive:true,force:true});});
+test.beforeEach(async ({studio}) => { folder = studio.folder; url = studio.url; });
 
 test('preserva interação entre canvas, apresentação e retorno',async({page})=>{
  await page.goto(url);
@@ -239,7 +228,8 @@ test('cria conexão rotulada e navega no minimapa',async({page})=>{
  await page.getByRole('textbox',{name:'Rótulo',exact:true}).fill('Escolher um texto');
  await page.getByRole('button',{name:'Salvar conexão',exact:true}).click();
  await expect(page.locator('.flow-label')).toHaveText('Escolher um texto');
- await expect.poll(async()=>JSON.parse(await readFile(path.join(stateDir(folder),'layout.json'),'utf8').catch(()=>'{}')).connections?.[0]?.label).toBe('Escolher um texto');
+ await expect.poll(async()=>JSON.parse(await readFile(path.join(folder,'experiment.json'),'utf8')).edges?.[0]).toEqual({from:'editorial',to:'compact',label:'Escolher um texto'});
+ expect(JSON.parse(await readFile(path.join(stateDir(folder),'layout.json'),'utf8').catch(()=>'{}')).connections).toBeUndefined();
  await page.reload();await expect(page.locator('.flow-label')).toHaveText('Escolher um texto');
  const world=page.locator('.world');const previous=await world.getAttribute('style');
  await page.locator('.minimap svg').click({position:{x:20,y:20}});
