@@ -41,7 +41,8 @@ The user wants to **use Draft**: run the viewer, open the canvas, preview or exp
 ## Limits
 
 - Classic HTML/CSS/JS in sandboxed iframes; modules and storage APIs are not guaranteed.
-- Read-only export bundles cannot persist feedback.
+- Read-only export bundles show comments but cannot create or resolve them.
+- Link frames with `data-draft-goto="<frameId>"` on any element; presentation mode follows it and the arrow keys follow `edges`.
 - `canvas/` in an app is for prototypes only; it does not generate app code.
 
 ## Working on frames (contract)

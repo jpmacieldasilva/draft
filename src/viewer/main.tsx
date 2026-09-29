@@ -10,7 +10,7 @@ import '@astryxdesign/core/astryx.css';
 import '@astryxdesign/theme-neutral/theme.css';
 import './style.css';
 import type { Frame, Position } from '../protocol';
-import { subscribe, snapshot, update, initialize, framePosition, iframes, setPosition, saveLayout, setLayout, fit, zoomBy, setMode, present, leavePresentation, syncBridge, mutate, refresh, discardLayoutConflict, activeClaim, compareGroups } from './store';
+import { subscribe, snapshot, update, initialize, framePosition, iframes, setPosition, saveLayout, setLayout, fit, zoomBy, setMode, present, leavePresentation, syncBridge, mutate, refresh, discardLayoutConflict, activeClaim, compareGroups, nextSteps, followFlow } from './store';
 const PRODUCT_NAME = 'Draft';
 function useStore() { return useSyncExternalStore(subscribe,snapshot); }
 function startMove(event:PointerEvent<HTMLElement>, frame:Frame, resize = false) {
@@ -90,6 +90,12 @@ function Info() {
  const readme=frame?.readme ?? (frame?'Sem README.md para este frame.':state.workspace?.readme || 'Adicione um README.md à pasta para dar contexto ao trabalho.');
  return <div className="scrim" onClick={()=>update({info:undefined})}><section role="dialog" aria-modal="true" aria-label="Informações" className="info-sheet" onClick={event=>event.stopPropagation()}><button className="close" aria-label="Fechar informações" onClick={()=>update({info:undefined})}><X/></button><p className="muted">{frame?'Sobre este protótipo':'Sobre este espaço'}</p><h1>{frame?.title ?? state.workspace?.experiment.title}</h1>{!frame&&<DecisionSummary/>}{frame&&<FrameMeta frame={frame}/>}<Markdown source={readme}/>{frame&&<Button label="Apresentar protótipo" onClick={()=>present(frame.id)}/>}</section></div>;
 }
+function NextSteps({frameId}:{frameId:string}) {
+ const state=useStore();
+ const steps=nextSteps(frameId);
+ if(!steps.length) return null;
+ return <nav className="presentation-flow" aria-label="Próximos passos">{steps.map(edge=><button key={edge.to} onClick={()=>followFlow(edge.to)} title={`Ir para ${state.workspace?.experiment.frames.find(frame=>frame.id===edge.to)?.title ?? edge.to}`}>{edge.label || state.workspace?.experiment.frames.find(frame=>frame.id===edge.to)?.title || edge.to}</button>)}</nav>;
+}
 function DecisionSummary() {
  const decision=useStore().workspace?.experiment.decision;
  if(!decision) return null;
@@ -146,10 +152,10 @@ function App() {
   </div>
   <nav className="toolbar" aria-label="Ferramentas do canvas"><button className={state.mode==='interact'?'active':''} title="Interagir com os protótipos" onClick={()=>setMode('interact')} aria-pressed={state.mode==='interact'}><MousePointer2/><span>Interagir</span></button>{!workspace.readOnly&&<><button className={state.mode==='element'?'active':''} title="Selecionar e editar elementos" onClick={()=>setMode('element')} aria-pressed={state.mode==='element'}><Scan/><span>Inspecionar</span></button><button className={state.mode==='comment'?'active':''} title="Marcar uma região para comentar" onClick={()=>setMode('comment')} aria-pressed={state.mode==='comment'}><SquareDashed/><span>Comentar</span></button></>}<span className="divider"/><button aria-label="Diminuir zoom" onClick={()=>zoomBy(1/1.15)}><Minus/></button><button className="zoom" title="Centralizar (0)" onClick={fit}>{Math.round(state.layout.zoom*100)}%</button><button aria-label="Aumentar zoom" onClick={()=>zoomBy(1.15)}><Plus/></button><button title="Centralizar (0)" aria-label="Centralizar frames" onClick={fit}><Maximize/></button></nav>
   {!!hidden.length&&<details className="hidden-frames"><summary>{hidden.length} oculto{hidden.length>1?'s':''}</summary><div className="menu">{hidden.map(frame=><button key={frame.id} onClick={()=>setPosition(frame.id,{...framePosition(frame),hidden:false})}>Restaurar {frame.title}</button>)}</div></details>}
-  {state.presenting&&<nav className="presentation-controls"><button onClick={leavePresentation}><ArrowLeft/>Canvas <kbd>Esc</kbd></button><span>{workspace.experiment.frames.find(frame=>frame.id===state.presenting)?.title}</span><button aria-label="Tela cheia" onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen();else void document.documentElement.requestFullscreen().catch(()=>update({error:'Tela cheia indisponível neste navegador.'}));}}><Maximize/></button><button onClick={()=>update({comments:!state.comments,inspector:false})}>Feedback</button></nav>}
+  {state.presenting&&<nav className="presentation-controls"><button onClick={leavePresentation}><ArrowLeft/>Canvas <kbd>Esc</kbd></button><span>{workspace.experiment.frames.find(frame=>frame.id===state.presenting)?.title}</span><NextSteps frameId={state.presenting}/><button aria-label="Tela cheia" onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen();else void document.documentElement.requestFullscreen().catch(()=>update({error:'Tela cheia indisponível neste navegador.'}));}}><Maximize/></button><button onClick={()=>update({comments:!state.comments,inspector:false})}>Feedback</button></nav>}
   {state.mode==='element'&&<div className="mode-hint">Clique em um elemento para inspecionar.<button onClick={()=>setMode('interact')}>Concluir</button></div>}
   {state.mode==='comment'&&<div className="mode-hint">Arraste no protótipo para marcar uma região.<button onClick={()=>setMode('interact')}>Concluir</button></div>}
-  {(state.error||workspace.diagnostics.length>0)&&<div className="notice" role="alert">{state.error ?? workspace.diagnostics.join(' · ')}{state.error&&<button onClick={()=>void discardLayoutConflict()}>Recarregar composição salva</button>}</div>}
+  {(state.notice||state.error||workspace.diagnostics.length>0)&&<div className="notice" role="alert">{[state.notice, state.error ?? workspace.diagnostics.join(' · ')].filter(Boolean).join(' · ')}{state.error&&<button onClick={()=>void discardLayoutConflict()}>Recarregar composição salva</button>}{state.notice&&!state.error&&<button onClick={()=>update({notice:undefined})}>Fechar</button>}</div>}
   <MiniMap/><ConnectionControls/><Info/><InspectorPanel/><Comments/><NewFrame/><Compare/>
  </main>;
 }

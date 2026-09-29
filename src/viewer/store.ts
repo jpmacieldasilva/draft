@@ -1,7 +1,7 @@
 import type { Feedback, Frame, Layout, Position, PresenceActor, Target, Workspace } from '../protocol';
 declare global { interface Window { __DRAFTROOM__?: Workspace } }
 export type Mode = 'interact' | 'element' | 'comment';
-interface State { workspace?: Workspace; layout: Layout; mode: Mode; selected?: string; presenting?: string; info?: string; target?: {frameId: string; target: Target}; feedback?: string; error?: string; busy: boolean; comments: boolean; inspector: boolean; newFrame?: boolean; compare?: { group: string; variant?: string } }
+interface State { workspace?: Workspace; layout: Layout; mode: Mode; selected?: string; presenting?: string; info?: string; target?: {frameId: string; target: Target}; feedback?: string; error?: string; busy: boolean; comments: boolean; inspector: boolean; newFrame?: boolean; notice?: string; compare?: { group: string; variant?: string } }
 const listeners = new Set<() => void>();
 let layoutDirty = false;
 let layoutRevision = '';
@@ -84,7 +84,28 @@ export function syncBridge(frameId: string) {
  const frame=iframes.get(frameId)?.contentWindow;
  frame?.postMessage({type:'draftroom:mode',mode:state.mode}, '*');
 }
-export function present(frameId: string) { update({presenting:frameId, selected:frameId, info:undefined}); location.hash = `frame/${encodeURIComponent(frameId)}`; }
+let trail: string[] = [];
+export function present(frameId: string, fromFlow = false) { if(!fromFlow) trail = []; update({presenting:frameId, selected:frameId, info:undefined}); location.hash = `frame/${encodeURIComponent(frameId)}`; }
+export function nextSteps(frameId: string) { return (state.workspace?.experiment.edges ?? []).filter(edge => edge.from === frameId && state.workspace?.experiment.frames.some(frame => frame.id === edge.to)); }
+export function followFlow(frameId: string) { if(state.presenting && state.presenting !== frameId) trail.push(state.presenting); present(frameId, true); }
+function flowBack() { const previous = trail.pop(); if(previous) present(previous, true); }
+function presentationKey(key: string) {
+ if(!state.presenting) return false;
+ if(key==='ArrowRight') { const next = nextSteps(state.presenting)[0]; if(next) followFlow(next.to); return true; }
+ if(key==='ArrowLeft') { flowBack(); return true; }
+ return false;
+}
+function centerOn(frameId: string) {
+ const frame = state.workspace?.experiment.frames.find(candidate => candidate.id === frameId); if(!frame) return;
+ const position = framePosition(frame), zoom = state.layout.zoom;
+ setLayout({...state.layout, x: innerWidth/2 - (position.x + position.width/2)*zoom, y: innerHeight/2 - (position.y + (position.height+44)/2)*zoom}, false);
+}
+function goto(frameId: string) {
+ if(!state.workspace?.experiment.frames.some(frame => frame.id === frameId)) { update({notice:`Destino não encontrado: ${frameId}`}); return; }
+ update({notice:undefined});
+ if(state.presenting) followFlow(frameId);
+ else { update({selected:frameId}); centerOn(frameId); }
+}
 export function leavePresentation() { update({presenting:undefined}); history.replaceState(null,'',`${location.pathname}${location.search}`); if(document.fullscreenElement) void document.exitFullscreen(); }
 export function readRoute() { const id = location.hash.startsWith('#frame/') ? decodeURIComponent(location.hash.slice(7)) : undefined; update({presenting:state.workspace?.experiment.frames.some(frame=>frame.id===id) ? id : undefined}); }
 export function selectInspectTarget(frameId: string, target: Target) {
@@ -104,6 +125,8 @@ function onMessage(event:MessageEvent<unknown>) {
  if(!frame || !event.data || typeof event.data !== 'object' || !('type' in event.data)) return;
  if(event.data.type==='draftroom:ready') syncBridge(frame[0]);
  if(event.data.type==='draftroom:escape') { setMode('interact'); leavePresentation(); }
+ if(event.data.type==='draftroom:goto' && 'frameId' in event.data && typeof event.data.frameId==='string' && state.mode==='interact') goto(event.data.frameId);
+ if(event.data.type==='draftroom:key' && 'key' in event.data && typeof event.data.key==='string') presentationKey(event.data.key);
  if(event.data.type==='draftroom:selection' && 'target' in event.data && isTarget(event.data.target)) {
   const target = event.data.target;
   if(state.mode==='element' && target.kind==='element') selectInspectTarget(frame[0], target);
@@ -113,6 +136,7 @@ function onMessage(event:MessageEvent<unknown>) {
 function onKey(event:KeyboardEvent) {
  if(event.key==='Escape') { setMode('interact'); update({target:undefined,info:undefined,comments:false,inspector:false,compare:undefined}); leavePresentation(); }
  if(event.target instanceof HTMLElement && event.target.closest('input,textarea,select,[contenteditable],form')) return;
+ if(presentationKey(event.key)) { event.preventDefault(); return; }
  if(event.key==='0') fit();
  const frame = state.workspace?.experiment.frames.find(frame => frame.id === state.selected);
  if (frame && event.key === 'Enter') present(frame.id);

@@ -2,12 +2,12 @@ import { mkdir, cp, readFile, writeFile, readdir, realpath, access } from 'node:
 import path from 'node:path';
 import { WorkspaceStore, confined, publicPath, RequestError } from './workspace.js';
 import { viewerDirectory, injectBridge } from './server.js';
-export async function exportWorkspace(folder: string, output: string) {
+export async function exportWorkspace(folder: string, output: string, options: { feedback?: boolean } = {}) {
   const store = new WorkspaceStore(folder); await store.initialize();
   const destination = path.resolve(output); if (destination === store.root || destination.startsWith(`${store.root}${path.sep}`)) throw new RequestError('Exporte para uma pasta fora do workspace.');
   try { await access(destination); throw new RequestError('A pasta de destino já existe. Escolha uma nova pasta.'); } catch (error) { if (error instanceof RequestError) throw error; }
   await mkdir(destination, { recursive: true }); await cp(viewerDirectory, destination, { recursive: true });
-  const workspace = await store.snapshot(); workspace.readOnly = true; workspace.token = ''; workspace.feedback = [];
+  const workspace = await store.snapshot(); workspace.readOnly = true; workspace.token = ''; workspace.presence = []; if (options.feedback === false) workspace.feedback = [];
   const content = path.join(destination, 'content'); await mkdir(content);
   async function copyDirectory(relative: string) {
     for (const entry of await readdir(await confined(store.root, relative), { withFileTypes: true })) {

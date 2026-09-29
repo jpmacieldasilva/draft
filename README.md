@@ -28,7 +28,8 @@ Opens the included studio study (`examples/studio`). Copy that folder when you s
 - **Compare** — live HTML alternatives on a local canvas (flow, minimap, viewport presets).
 - **Inspect** — try type, color, and spacing on the live frame. The preview is temporary; **Salvar ajuste** writes the change into that frame's HTML (never into a stylesheet shared with other frames), and **Restaurar original** undoes only the declarations Draft wrote.
 - **Comment** — pin a point or drag a region next to the pixels.
-- **Share** — same folder via Git or zip; `draft export` builds a read-only bundle.
+- **Present the flow** — in presentation mode, arrow keys follow `edges` (← goes back), the bar lists the next steps, and any element with `data-draft-goto="<frameId>"` inside a prototype jumps to that frame. On the canvas the same link selects and centers the target.
+- **Share** — same folder via Git or zip; `draft export` builds a read-only bundle with the flow and the comments (add `--no-feedback` to leave comments out).
 
 Local state (canvas layout, comments, presence, undo baselines) lives in `.draft/`. Folders from older versions with `.draftroom/` are migrated on open.
 
@@ -91,7 +92,7 @@ Everything that matters for the study lives in the manifest, so it travels with 
 - No guaranteed support for modules, iframe storage, or network APIs.
 - Visual pins are geometric at comment time; they do not follow scroll or DOM changes automatically.
 - Prefer stable selectors (`data-draftroom-id`, `id`).
-- Read-only bundles do not persist remote feedback.
+- Read-only bundles show comments but cannot create or resolve them.
 - Draft stays a **local folder** — not a cloud product, vector app, or image-gen workbench.
 
 ## Developer — commands
@@ -105,7 +106,7 @@ draft inspect /path/to/workspace
 draft context /path/to/workspace          # what an agent should read before editing
 draft feedback list /path/to/workspace --open
 draft feedback resolve /path/to/workspace <comment-id>
-draft export /path/to/study /path/to/bundle
+draft export /path/to/study /path/to/bundle [--no-feedback]
 ```
 
 ## Use Draft with your agent

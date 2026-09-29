@@ -16,7 +16,7 @@ const USAGE = [
   '  draft presence claim <pasta> [frameId] [--label Agent] [--ttl 120] [--id <id>]',
   '  draft presence clear <pasta> [frameId] [--id <id>]',
   '  draft presence list [pasta]',
-  '  draft export <pasta> <destino>',
+  '  draft export <pasta> <destino> [--no-feedback]',
 ].join('\n');
 
 function parseArgs(cliArgs: string[]) {
@@ -41,8 +41,8 @@ const port = Number(process.env.DRAFT_PORT ?? process.env.PROTOFIELD_PORT ?? 417
 try {
   if (command === 'export') {
     const [folder, output] = rest;
-    if (!folder || !output) throw new Error('Uso: draft export <pasta> <destino>');
-    await exportWorkspace(path.resolve(folder), path.resolve(output));
+    if (!folder || !output) throw new Error('Uso: draft export <pasta> <destino> [--no-feedback]');
+    await exportWorkspace(path.resolve(folder), path.resolve(output), { feedback: flags['no-feedback'] !== 'true' });
     console.log(`Bundle somente leitura: ${path.resolve(output)}`);
   } else if (command === 'create') {
     const [folder, title] = rest;

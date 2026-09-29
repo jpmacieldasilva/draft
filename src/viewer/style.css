@@ -102,3 +102,5 @@ details[open]>.menu,details[open]>.viewport-panel{animation:menu-enter var(--mot
 .compare-panes figcaption{display:grid;gap:3px;max-width:420px;font-size:13px}
 .compare-panes figcaption p{margin:0;color:#4a5566}
 .compare-panes iframe{border:1px solid #e3e7ee;border-radius:12px;background:#fff;max-width:100%}
+.presentation-flow{display:flex;gap:6px;align-items:center}
+.presentation-flow button::after{content:" →"}

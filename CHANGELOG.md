@@ -21,6 +21,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- Navigable study: `data-draft-goto="<frameId>"` inside a prototype jumps to that frame while presenting (selects and centers it on the canvas); arrow keys follow `edges` with a back history; the presentation bar lists the next steps. Unknown targets show a notice.
+- `draft export` keeps comments (read-only) and edges; `--no-feedback` leaves comments out.
 - Manifest `schemaVersion: 2`: frame `state`, `role` (control/variant), `group`, `tests`, `signal`; study `decision` (hypothesis, criteria); flow `edges`. Invalid or duplicate edges and multiple controls per group show a diagnostic instead of breaking the viewer.
 - Frame badges for state and role, decision and frame metadata in the info panel, and **Comparar** (control vs. variant side by side with the criteria).
 - `draft create --flow` scaffolds empty, loading, success and error states with edges.

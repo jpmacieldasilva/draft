@@ -89,8 +89,18 @@
     }
   },true);
   document.addEventListener('pointercancel',()=>{dragging=undefined;clear();},true);
-  document.addEventListener('click',event=>{if(mode==='element'||mode==='comment'){event.preventDefault();event.stopImmediatePropagation();}},true);
-  document.addEventListener('keydown',event=>{if(event.key==='Escape'){mode='interact';dragging=undefined;clear();parent.postMessage({type:'draftroom:escape'},'*');}},true);
+  document.addEventListener('click',event=>{
+    if(mode==='element'||mode==='comment'){event.preventDefault();event.stopImmediatePropagation();return;}
+    const link=event.target instanceof Element?event.target.closest('[data-draft-goto]'):null;
+    if(!link)return;
+    event.preventDefault();
+    parent.postMessage({type:'draftroom:goto',frameId:String(link.getAttribute('data-draft-goto')||'').slice(0,200)},'*');
+  },true);
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape'){mode='interact';dragging=undefined;clear();parent.postMessage({type:'draftroom:escape'},'*');return;}
+    const editable=event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable]');
+    if((event.key==='ArrowLeft'||event.key==='ArrowRight')&&!editable&&!event.altKey&&!event.ctrlKey&&!event.metaKey) parent.postMessage({type:'draftroom:key',key:event.key},'*');
+  },true);
   function announceReady() { parent.postMessage({type:'draftroom:ready'},'*'); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',announceReady);
   else announceReady();
