@@ -21,15 +21,22 @@ When the user wants to use Draft for **this folder**, follow the repository skil
 This folder is my Draft workspace. Start the viewer for the current directory, tell me the URL, and keep it running. Do not change my prototype files.
 ```
 
-## Agent edits (presence)
+## Working on frames (contract)
 
-Before changing HTML/CSS in `frames/`, claim the frame so humans do not lose Inspect work:
+Before changing anything in `frames/`, run the loop below. Every step is a CLI command, so any agent can follow it.
 
 ```bash
-draft presence claim . <frameId> --label Agent --ttl 120
-# … edit frames/<frameId>/ …
-draft presence clear . <frameId>
+draft context .                                    # 1. read: manifest, READMEs, frame files, open comments, claims, rules
+draft presence claim . <frameId> --label Agent     # 2. claim the frame you will edit
+# 3. edit only frames/<frameId>/
+draft feedback resolve . <commentId>               # 4. resolve each comment you addressed
+draft presence clear . <frameId>                   # 5. release the frame
 ```
+
+- Do not edit a frame whose `claimedBy` (in `draft context`) is someone else.
+- Allowed in frames: classic HTML, CSS and local scripts. No ES modules and no network: CDNs, remote fonts and remote images are blocked by the viewer's CSP.
+- Put a stable `data-draftroom-id` on elements that receive comments or Inspect tweaks.
+- `draft feedback list . --open` shows what is still pending.
 
 While a claim is active, Inspect is soft-locked on that frame (no **Salvar ajuste**). The ring and **Agent** pill only signal presence — they are not the lock.
 

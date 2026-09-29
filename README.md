@@ -78,6 +78,9 @@ npm run build
 draft open examples/studio    # or: npm run demo
 draft create /path/to/canvas "Title"
 draft inspect /path/to/workspace
+draft context /path/to/workspace          # what an agent should read before editing
+draft feedback list /path/to/workspace --open
+draft feedback resolve /path/to/workspace <comment-id>
 draft export /path/to/study /path/to/bundle
 ```
 

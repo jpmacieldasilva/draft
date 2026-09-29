@@ -3,60 +3,84 @@ import path from 'node:path';
 import { startRuntime } from './server.js';
 import { exportWorkspace } from './export.js';
 import { createWorkspace, discoverExperiment, WorkspaceStore } from './workspace.js';
-const args = process.argv.slice(2);
-const [command = 'open', folder = '.', output] = args;
-const port = Number(process.env.DRAFT_PORT ?? process.env.PROTOFIELD_PORT ?? 4173);
-function parsePresenceArgs(cliArgs: string[]) {
+import { buildContext, feedbackItems } from './agent.js';
+
+const USAGE = [
+  'Uso:',
+  '  draft open [pasta]',
+  '  draft create <pasta> [título]',
+  '  draft inspect [pasta]',
+  '  draft context [pasta]',
+  '  draft feedback list [pasta] [--open]',
+  '  draft feedback resolve|reopen <pasta> <id>',
+  '  draft presence claim <pasta> [frameId] [--label Agent] [--ttl 120] [--id <id>]',
+  '  draft presence clear <pasta> [frameId] [--id <id>]',
+  '  draft presence list [pasta]',
+  '  draft export <pasta> <destino>',
+].join('\n');
+
+function parseArgs(cliArgs: string[]) {
   const flags: Record<string, string> = {};
   const positionals: string[] = [];
   for (let i = 0; i < cliArgs.length; i++) {
     const arg = cliArgs[i];
-    if (arg.startsWith('--')) {
-      const key = arg.slice(2);
-      const next = cliArgs[i + 1];
-      if (next && !next.startsWith('--')) {
-        flags[key] = next;
-        i++;
-      } else {
-        flags[key] = 'true';
-      }
-    } else {
-      positionals.push(arg);
-    }
+    if (!arg.startsWith('--')) { positionals.push(arg); continue; }
+    const key = arg.slice(2);
+    const next = cliArgs[i + 1];
+    if (next !== undefined && !next.startsWith('--')) { flags[key] = next; i++; }
+    else flags[key] = 'true';
   }
   return { flags, positionals };
 }
-try {
-  if (command === 'export') { if (!output) throw new Error('Uso: draft export <pasta> <destino>'); await exportWorkspace(path.resolve(folder), path.resolve(output)); console.log(`Bundle somente leitura: ${path.resolve(output)}`); }
-  else if (command === 'create') { console.log(`Workspace criado: ${await createWorkspace(path.resolve(folder), output || 'Meu espaço')}`); }
-  else if (command === 'inspect') { const discovery = await discoverExperiment(path.resolve(folder)); console.log(JSON.stringify({ generated: discovery.generated, experiment: discovery.experiment }, null, 2)); }
-  else if (command === 'open') { const runtime = await startRuntime(path.resolve(folder), port); console.log(`Draft: ${runtime.url}`); const shutdown = () => { void runtime.close().then(() => process.exit(0)); }; process.once('SIGINT', shutdown); process.once('SIGTERM', shutdown); }
-  else if (command === 'presence') {
-    const sub = args[1];
-    const { flags, positionals } = parsePresenceArgs(args.slice(2));
-    const targetFolder = positionals[0];
-    if (!targetFolder && sub !== 'list') throw new Error('Uso: draft presence claim <workspace> [frameId] [--label Agent] [--ttl 120] | clear <workspace> [frameId] | list <workspace>');
-    const store = new WorkspaceStore(path.resolve(targetFolder || '.'));
-    if (sub === 'claim') {
-      const frameId = positionals[1] || undefined;
-      const label = flags.label;
-      const ttlSeconds = flags.ttl ? Number(flags.ttl) : undefined;
-      const id = flags.id;
-      const { actor } = await store.claim({ id, label, frameId, ttlSeconds });
-      console.log(JSON.stringify(actor, null, 2));
-    } else if (sub === 'clear') {
-      const frameId = positionals[1];
-      const id = flags.id;
-      const filter = id ? { id } : (frameId !== undefined ? { frameId } : undefined);
-      const state = await store.clearPresence(filter);
-      console.log(JSON.stringify(state, null, 2));
-    } else if (sub === 'list') {
-      const presence = await store.loadPresence();
-      console.log(JSON.stringify(presence, null, 2));
-    } else {
-      throw new Error('Uso: draft presence claim <workspace> [frameId] [--label Agent] [--ttl 120] | clear <workspace> [frameId] | list <workspace>');
-    }
-  }
-  else throw new Error('Uso: draft open <pasta> | create <pasta> [título] | inspect <pasta> | export <pasta> <destino> | presence <claim|clear|list> <pasta>');
-} catch (error) { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; }
 
+const print = (value: unknown) => console.log(JSON.stringify(value, null, 2));
+const { flags, positionals } = parseArgs(process.argv.slice(2));
+const [command = 'open', ...rest] = positionals;
+const port = Number(process.env.DRAFT_PORT ?? process.env.PROTOFIELD_PORT ?? 4173);
+
+try {
+  if (command === 'export') {
+    const [folder, output] = rest;
+    if (!folder || !output) throw new Error('Uso: draft export <pasta> <destino>');
+    await exportWorkspace(path.resolve(folder), path.resolve(output));
+    console.log(`Bundle somente leitura: ${path.resolve(output)}`);
+  } else if (command === 'create') {
+    const [folder, title] = rest;
+    if (!folder) throw new Error('Uso: draft create <pasta> [título]');
+    console.log(`Workspace criado: ${await createWorkspace(path.resolve(folder), title || 'Meu espaço')}`);
+  } else if (command === 'inspect') {
+    const discovery = await discoverExperiment(path.resolve(rest[0] ?? '.'));
+    print({ generated: discovery.generated, experiment: discovery.experiment });
+  } else if (command === 'context') {
+    print(await buildContext(new WorkspaceStore(path.resolve(rest[0] ?? '.'))));
+  } else if (command === 'feedback') {
+    const [sub, folder = '.', id] = rest;
+    const store = new WorkspaceStore(path.resolve(folder));
+    if (sub === 'list') {
+      const workspace = await store.snapshot();
+      print(feedbackItems(workspace.feedback.filter(item => flags.open !== 'true' || item.status === 'open')));
+    } else if (sub === 'resolve' || sub === 'reopen') {
+      if (!id) throw new Error(`Uso: draft feedback ${sub} <pasta> <id>`);
+      const workspace = await store.feedback({ status: sub === 'resolve' ? 'resolved' : 'open' }, id);
+      print(feedbackItems(workspace.feedback.filter(item => item.id === id))[0]);
+    } else throw new Error(USAGE);
+  } else if (command === 'open') {
+    const runtime = await startRuntime(path.resolve(rest[0] ?? '.'), port);
+    console.log(`Draft: ${runtime.url}`);
+    const shutdown = () => { void runtime.close().then(() => process.exit(0)); };
+    process.once('SIGINT', shutdown);
+    process.once('SIGTERM', shutdown);
+  } else if (command === 'presence') {
+    const [sub, folder, frameId] = rest;
+    if (!folder && sub !== 'list') throw new Error(USAGE);
+    const store = new WorkspaceStore(path.resolve(folder || '.'));
+    if (sub === 'claim') {
+      const { actor } = await store.claim({ id: flags.id, label: flags.label, frameId: frameId || undefined, ttlSeconds: flags.ttl ? Number(flags.ttl) : undefined });
+      print(actor);
+    } else if (sub === 'clear') {
+      print(await store.clearPresence(flags.id ? { id: flags.id } : (frameId !== undefined ? { frameId } : undefined)));
+    } else if (sub === 'list') {
+      print(await store.loadPresence());
+    } else throw new Error(USAGE);
+  } else throw new Error(USAGE);
+} catch (error) { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; }

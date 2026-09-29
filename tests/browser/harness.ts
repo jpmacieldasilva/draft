@@ -40,7 +40,8 @@ export function startViewer(folder: string, env: Record<string, string> = {}): P
 export interface CliResult { code: number; stdout: string; stderr: string; json: <T = unknown>() => T }
 export function runCli(args: string[], env: Record<string, string> = {}): Promise<CliResult> {
  return new Promise((resolve, reject) => {
-  const child = spawn(process.execPath, [CLI, ...args], { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const { FORCE_COLOR: _color, NO_COLOR: _noColor, ...inherited } = process.env;
+  const child = spawn(process.execPath, [CLI, ...args], { env: { ...inherited, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = '', stderr = '';
   child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
   child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });

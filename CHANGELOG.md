@@ -17,6 +17,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- `draft context <folder>`: manifest, READMEs, frame files, open comments, active claims and emission rules in one JSON for agents.
+- `draft feedback list [--open]`, `draft feedback resolve <id>` and `draft feedback reopen <id>`.
+- Agent contract in `AGENTS.md` and the `use-draft` skill: read context, claim, edit `frames/<id>/`, resolve, release.
 - E2E evidence harness: `e2e-evidence/evidence.json` and the Playwright report are uploaded by CI.
 
 - Root Cursor skill `use-draft` and README agent contract: any request to use Draft triggers clone-once, build-once, open `examples/studio` or project `canvas/`.
