@@ -74,7 +74,7 @@ test('get_selection segue a seleção do viewer e write_frame recarrega o frame'
   await page.goto(studio.url);
   await page.getByRole('button', { name: 'Inspecionar', exact: false }).click();
   await page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('heading', { name: 'A arte de prestar atenção' }).click();
-  await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Inspecionar' })).toBeVisible();
   await expect.poll(async () => (await mcp.call<{ selection: { frameId: string; target: { selector: string } } | null }>('get_selection')).json().selection?.target.selector).toBe('[data-draftroom-id="featured-title"]');
   const selection = (await mcp.call<{ selection: { frameId: string } }>('get_selection')).json().selection;
   expect(selection.frameId).toBe('editorial');

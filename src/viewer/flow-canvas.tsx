@@ -1,7 +1,9 @@
 import { t } from '../i18n';
 import { useEffect, useSyncExternalStore, type FormEvent, type PointerEvent, type MouseEvent } from 'react';
 import { edgeId, type Connection, type Edge, type Position } from '../protocol';
-import { snapshot, subscribe, setLayout, framePosition, mutate } from './store';
+import { X } from 'lucide-react';
+import { snapshot, subscribe, setLayout, framePosition, mutate, addEscapeLayer } from './store';
+import { PROTOTYPE_LINKS_UI } from './features';
 import './flow-canvas.css';
 
 interface FlowState { open: boolean; source?: string; selected?: string; pending?: Connection; pointer?: { x: number; y: number } }
@@ -11,7 +13,11 @@ function flowSnapshot() { return flow; }
 function subscribeFlow(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 function changeFlow(change: Partial<FlowState>) { flow = { ...flow, ...change }; listeners.forEach(listener => listener()); }
 function useFlow() { return useSyncExternalStore(subscribeFlow, flowSnapshot); }
-function cancelConnection(event: KeyboardEvent) { if (event.key === 'Escape') changeFlow({ source: undefined, pointer: undefined, open: false }); }
+function cancelConnection() {
+ if (snapshot().presenting || (!flow.open && !flow.source)) return false;
+ changeFlow({ source: undefined, pointer: undefined, open: false });
+ return true;
+}
 function selectConnection(id: string) { if (!snapshot().workspace?.readOnly) changeFlow({ selected: id, open: true, source: undefined }); }
 function connections(): Connection[] { return (snapshot().workspace?.experiment.edges ?? []).map(edge => ({ ...edge, id: edgeId(edge) })); }
 function saveEdges(edges: Edge[]) { return mutate('edges', { edges: edges.map(({ from, to, label }) => ({ from, to, label })) }); }
@@ -57,6 +63,7 @@ function startConnector(event: PointerEvent<HTMLButtonElement>, frameId: string)
  window.addEventListener('pointercancel', cancel);
 }
 export function FrameConnector({ frameId }: { frameId: string }) {
+ if (!PROTOTYPE_LINKS_UI) return null;
  const state = useSyncExternalStore(subscribe, snapshot), current = useFlow();
  if (state.workspace?.readOnly || state.presenting) return null;
  return <button className={`frame-connector ${current.source === frameId ? 'connecting' : ''} ${current.source ? 'available' : ''}`} data-frame-connector={frameId} aria-label={current.source && current.source !== frameId ? t('flow.connectHere') : t('flow.create')} title={t('flow.connectorTitle')} onPointerDown={event => startConnector(event, frameId)} onClick={event => { if (event.detail === 0) clickConnector(frameId); }}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10m-4-4 4 4-4 4"/></svg></button>;
@@ -70,6 +77,7 @@ function curve(from: Position, to: Position | { x: number; y: number }) {
  return { path: `M ${x1} ${y1} C ${x1 + bend * direction} ${y1+bow}, ${x2 - bend * direction} ${y2+bow}, ${x2} ${y2}`, x: (x1 + x2) / 2, y: (y1 + y2) / 2+bow*.75 };
 }
 export function FlowConnections() {
+ if (!PROTOTYPE_LINKS_UI) return null;
  const state = useSyncExternalStore(subscribe, snapshot), current = useFlow();
  if (state.presenting) return null;
  return <svg className="flow-connections" aria-label={t('flow.label')}><defs><marker id="flow-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M1 1 7 4 1 7" fill="none" stroke="currentColor" strokeWidth="1.4"/></marker></defs>{(state.workspace?.experiment.edges ?? []).map(edge => ({ ...edge, id: edgeId(edge) })).map(connection => {
@@ -90,12 +98,13 @@ function saveConnection(event: FormEvent<HTMLFormElement>) {
 }
 function removeConnection() { void saveEdges(connections().filter(connection => connection.id !== flow.selected)); changeFlow({ selected: undefined, open: false }); }
 export function ConnectionControls() {
+ if (!PROTOTYPE_LINKS_UI) return null;
  const state = useSyncExternalStore(subscribe, snapshot), current = useFlow();
- useEffect(() => { window.addEventListener('keydown', cancelConnection); return () => window.removeEventListener('keydown', cancelConnection); }, []);
+ useEffect(() => addEscapeLayer(cancelConnection), []);
  const frames = state.workspace?.experiment.frames.filter(frame => !framePosition(frame).hidden) ?? [];
  const selected = (state.workspace?.experiment.edges ?? []).map(edge => ({ ...edge, id: edgeId(edge) })).find(connection => connection.id === current.selected) ?? (current.pending?.id === current.selected ? current.pending : undefined);
  if (state.presenting || state.workspace?.readOnly) return null;
- return current.open ? <section className="connection-panel" aria-label={t('flow.edit')}><header><strong>{selected ? t('flow.edit') : t('flow.connect')}</strong><button aria-label={t('flow.close')} onClick={() => changeFlow({ open: false, source: undefined })}>×</button></header><p>{current.source ? t('flow.hintSource') : t('flow.hint')}</p>{frames.length < 2 ? <p>{t('flow.needTwo')}</p> : <form key={`${current.selected ?? 'new'}-${current.source ?? ''}`} onSubmit={saveConnection}><label>{t('flow.from')}<select name="from" defaultValue={selected?.from ?? current.source ?? frames[0]?.id}>{frames.map(frame => <option key={frame.id} value={frame.id}>{frame.title}</option>)}</select></label><label>{t('flow.to')}<select name="to" defaultValue={selected?.to ?? frames.find(frame => frame.id !== (current.source ?? frames[0]?.id))?.id}>{frames.map(frame => <option key={frame.id} value={frame.id}>{frame.title}</option>)}</select></label><label>{t('flow.labelField')}<input name="label" maxLength={160} defaultValue={selected?.label ?? ''} placeholder={t('flow.placeholder')}/></label><footer>{selected && <button type="button" onClick={removeConnection}>{t('flow.remove')}</button>}<button className="primary" type="submit">{selected ? t('flow.save') : t('flow.create')}</button></footer></form>}</section> : null;
+ return current.open ? <section className="connection-panel" aria-label={t('flow.edit')}><header><strong>{selected ? t('flow.edit') : t('flow.connect')}</strong><button aria-label={t('flow.close')} onClick={() => changeFlow({ open: false, source: undefined })}><X /></button></header><p>{current.source ? t('flow.hintSource') : t('flow.hint')}</p>{frames.length < 2 ? <p>{t('flow.needTwo')}</p> : <form key={`${current.selected ?? 'new'}-${current.source ?? ''}`} onSubmit={saveConnection}><label>{t('flow.from')}<select name="from" defaultValue={selected?.from ?? current.source ?? frames[0]?.id}>{frames.map(frame => <option key={frame.id} value={frame.id}>{frame.title}</option>)}</select></label><label>{t('flow.to')}<select name="to" defaultValue={selected?.to ?? frames.find(frame => frame.id !== (current.source ?? frames[0]?.id))?.id}>{frames.map(frame => <option key={frame.id} value={frame.id}>{frame.title}</option>)}</select></label><label>{t('flow.labelField')}<input name="label" maxLength={160} defaultValue={selected?.label ?? ''} placeholder={t('flow.placeholder')}/></label><footer>{selected && <button type="button" onClick={removeConnection}>{t('flow.remove')}</button>}<button className="primary" type="submit">{selected ? t('flow.save') : t('flow.create')}</button></footer></form>}</section> : null;
 }
 function centerMap(event: MouseEvent<SVGSVGElement>, left: number, top: number, width: number, height: number) {
  const bounds = event.currentTarget.getBoundingClientRect();

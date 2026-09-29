@@ -81,3 +81,4 @@ export const test = base.extend<Fixtures>({
 });
 
 export { expect };
+export { PROTOTYPE_LINKS_UI } from '../../src/viewer/features';

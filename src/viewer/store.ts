@@ -1,14 +1,17 @@
 import { normalizeLocale, setLocale, t, DEFAULT_LOCALE } from '../i18n';
 import type { Feedback, Frame, Layout, Position, PresenceActor, Target, Workspace } from '../protocol';
+import { PROTOTYPE_LINKS_UI } from './features';
 declare global { interface Window { __DRAFTROOM__?: Workspace } }
 export type Mode = 'interact' | 'element' | 'comment';
-interface State { workspace?: Workspace; layout: Layout; mode: Mode; selected?: string; presenting?: string; info?: string; target?: {frameId: string; target: Target}; feedback?: string; error?: string; busy: boolean; comments: boolean; inspector: boolean; newFrame?: boolean; notice?: string; compare?: { group: string; variant?: string }; blocked: Record<string, string[]> }
+interface State { workspace?: Workspace; layout: Layout; mode: Mode; selected?: string; presenting?: string; info?: string; target?: {frameId: string; target: Target}; feedback?: string; error?: string; busy: boolean; comments: boolean; inspector: boolean; newFrame?: boolean; notice?: string; compare?: { group: string; variant?: string }; blocked: Record<string, string[]>; commentScope: 'frame' | 'all'; commentSaved?: boolean; presentFill: boolean }
 const listeners = new Set<() => void>();
 let layoutDirty = false;
 let layoutRevision = '';
 let layoutVersion = 0;
 let layoutSaving = false;
-let state: State = { layout: { frames: {}, zoom: .65, x: 80, y: 120 }, mode: 'interact', busy: false, comments: false, inspector: false, blocked: {} };
+const FILL_KEY = 'draft.presentFill';
+function storedFill() { try { return sessionStorage.getItem(FILL_KEY) === '1'; } catch { return false; } }
+let state: State = { layout: { frames: {}, zoom: .65, x: 80, y: 120 }, mode: 'interact', busy: false, comments: false, inspector: false, blocked: {}, commentScope: 'frame', presentFill: storedFill() };
 export const iframes = new Map<string, HTMLIFrameElement>();
 export function subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 export function snapshot() { return state; }
@@ -67,8 +70,9 @@ async function persistLayout() {
 }
 export function setLayout(layout: Layout, save = true) { layoutDirty = true; layoutVersion++; update({layout}); if(save) saveLayout(); }
 export function setPosition(frameId: string, position: Position, save = true) { setLayout({...state.layout, frames: {...state.layout.frames, [frameId]:position}}, save); }
-export function zoomBy(factor: number) {
- const zoom = Math.min(2, Math.max(.15, state.layout.zoom * factor));
+export function zoomBy(factor: number) { zoomTo(state.layout.zoom * factor); }
+export function zoomTo(target: number) {
+ const zoom = Math.min(2, Math.max(.15, target));
  const cx = innerWidth / 2, cy = innerHeight / 2;
  setLayout({...state.layout, zoom, x: cx - (cx-state.layout.x) * zoom/state.layout.zoom, y:cy-(cy-state.layout.y)*zoom/state.layout.zoom});
 }
@@ -82,18 +86,43 @@ export function fit() {
  const zoom = Math.min(1, (innerWidth-128)/width, (innerHeight-220)/height);
  setLayout({...state.layout, zoom:Math.max(.15,zoom), x:(innerWidth-width*zoom)/2-left*zoom, y:120-top*zoom}, false);
 }
-export function setMode(mode: Mode) { update({mode}); iframes.forEach(iframe => iframe.contentWindow?.postMessage({type:'draftroom:mode', mode}, '*')); }
+export function setMode(mode: Mode) {
+ update({mode});
+ if(mode==='element') update({comments:false});
+ if(mode==='comment') update({inspector:false});
+ if(mode==='interact') update({inspector:false, target:undefined});
+ iframes.forEach(iframe => iframe.contentWindow?.postMessage({type:'draftroom:mode', mode}, '*'));
+}
+/** Arm comment mode on the canvas (click element → popover). */
+export function beginCommenting() {
+ setMode('comment');
+ update({ inspector: false, comments: false, target: undefined, feedback: undefined });
+}
+export function focusComment(commentId: string) {
+ const comment = state.workspace?.feedback.find(entry => entry.id===commentId);
+ if(!comment) return;
+ if(state.presenting) { if(state.presenting!==comment.frameId) present(comment.frameId, true); }
+ else { update({selected:comment.frameId}); centerOn(comment.frameId); }
+ setMode('interact');
+ update({feedback:commentId, comments:false, inspector:false, target:undefined, selected:comment.frameId});
+}
 export function syncBridge(frameId: string) {
  const frame=iframes.get(frameId)?.contentWindow;
  frame?.postMessage({type:'draftroom:mode',mode:state.mode}, '*');
 }
 let trail: string[] = [];
-export function present(frameId: string, fromFlow = false) { if(!fromFlow) trail = []; update({presenting:frameId, selected:frameId, info:undefined}); location.hash = `frame/${encodeURIComponent(frameId)}`; }
+export function present(frameId: string, fromFlow = false) {
+ if(!fromFlow) trail = [];
+ setMode('interact');
+ update({presenting:frameId, selected:frameId, info:undefined, inspector:false, comments:false, target:undefined, feedback:undefined});
+ location.hash = `frame/${encodeURIComponent(frameId)}`;
+}
 export function nextSteps(frameId: string) { return (state.workspace?.experiment.edges ?? []).filter(edge => edge.from === frameId && state.workspace?.experiment.frames.some(frame => frame.id === edge.to)); }
 export function followFlow(frameId: string) { if(state.presenting && state.presenting !== frameId) trail.push(state.presenting); present(frameId, true); }
 function flowBack() { const previous = trail.pop(); if(previous) present(previous, true); }
 function presentationKey(key: string) {
  if(!state.presenting) return false;
+ if(!PROTOTYPE_LINKS_UI) return false;
  if(key==='ArrowRight') { const next = nextSteps(state.presenting)[0]; if(next) followFlow(next.to); return true; }
  if(key==='ArrowLeft') { flowBack(); return true; }
  return false;
@@ -109,14 +138,24 @@ function goto(frameId: string) {
  if(state.presenting) followFlow(frameId);
  else { update({selected:frameId}); centerOn(frameId); }
 }
+/** Frames in manifest order, minus the ones hidden on the canvas; flow edges form a graph, so they cannot number a position. */
+export function presentationOrder() { return (state.workspace?.experiment.frames ?? []).filter(frame => !framePosition(frame).hidden || frame.id === state.presenting); }
+/** Fill mode gives the prototype a different CSS viewport, so region comments (stored in the saved viewport) only happen at saved size. */
+export function setPresentFill(presentFill: boolean) {
+ try { sessionStorage.setItem(FILL_KEY, presentFill ? '1' : '0'); } catch { /* Private mode: keep the choice in memory. */ }
+ update({presentFill});
+ if(presentFill && state.mode === 'comment') { update({target: state.target?.target.kind === 'region' ? undefined : state.target}); setMode('interact'); }
+}
 export function leavePresentation() { update({presenting:undefined}); history.replaceState(null,'',`${location.pathname}${location.search}`); if(document.fullscreenElement) void document.exitFullscreen(); }
 export function readRoute() { const id = location.hash.startsWith('#frame/') ? decodeURIComponent(location.hash.slice(7)) : undefined; update({presenting:state.workspace?.experiment.frames.some(frame=>frame.id===id) ? id : undefined}); }
 export function selectInspectTarget(frameId: string, target: Target) {
+ setMode('element');
  update({ target: { frameId, target }, selected: frameId, inspector: true, comments: false, feedback: undefined });
  shareSelection(frameId, target);
 }
 export function selectCommentTarget(frameId: string, target: Target) {
- update({ target: { frameId, target }, selected: frameId, comments: true, inspector: false, feedback: undefined });
+ setMode('comment');
+ update({ target: { frameId, target }, selected: frameId, comments: false, inspector: false, feedback: undefined, commentSaved: false });
  shareSelection(frameId, target);
 }
 function shareSelection(frameId: string, target: Target) {
@@ -132,9 +171,10 @@ function isTarget(value: unknown): value is Target {
 }
 function onMessage(event:MessageEvent<unknown>) {
  const frame = [...iframes].find(([,iframe])=>iframe.contentWindow===event.source);
- if(!frame || !event.data || typeof event.data !== 'object' || !('type' in event.data)) return;
+ if(!event.data || typeof event.data !== 'object' || !('type' in event.data)) return;
+ if(event.data.type==='draftroom:escape' && (frame || [...document.querySelectorAll('iframe')].some(iframe=>iframe.contentWindow===event.source))) { closeLayer(); iframes.forEach((_iframe,id)=>syncBridge(id)); return; }
+ if(!frame) return;
  if(event.data.type==='draftroom:ready') syncBridge(frame[0]);
- if(event.data.type==='draftroom:escape') { setMode('interact'); leavePresentation(); }
  if(event.data.type==='draftroom:goto' && 'frameId' in event.data && typeof event.data.frameId==='string' && state.mode==='interact') goto(event.data.frameId);
  if(event.data.type==='draftroom:blocked' && 'uri' in event.data && typeof event.data.uri==='string') {
   const host = blockedHost(event.data.uri), known = state.blocked[frame[0]] ?? [];
@@ -144,16 +184,48 @@ function onMessage(event:MessageEvent<unknown>) {
  if(event.data.type==='draftroom:selection' && 'target' in event.data && isTarget(event.data.target)) {
   const target = event.data.target;
   if(state.mode==='element' && target.kind==='element') selectInspectTarget(frame[0], target);
-  if(state.mode==='comment' && target.kind==='region') selectCommentTarget(frame[0], target);
+  if(state.mode==='comment' && (target.kind==='element' || target.kind==='region')) selectCommentTarget(frame[0], target);
  }
 }
+const escapeLayers = new Set<() => boolean>();
+export function addEscapeLayer(layer: () => boolean) { escapeLayers.add(layer); return () => { escapeLayers.delete(layer); }; }
+function closeLayer() {
+ const menus = [...document.querySelectorAll<HTMLDetailsElement>('details[open]:not(.editor-group)')];
+ const menu = menus.find(candidate => candidate.contains(document.activeElement)) ?? menus.at(-1);
+ if(menu) { menu.open = false; menu.querySelector('summary')?.focus(); return true; }
+ if(state.newFrame) { update({newFrame:false}); return true; }
+ if(state.compare) { update({compare:undefined}); return true; }
+ if(state.info) { update({info:undefined}); return true; }
+ for(const layer of escapeLayers) if(layer()) return true;
+ if(state.inspector || state.comments || state.target || state.feedback) { update({inspector:false,comments:false,target:undefined,feedback:undefined}); return true; }
+ if(state.mode!=='interact') { setMode('interact'); return true; }
+ if(state.presenting) { leavePresentation(); return true; }
+ return false;
+}
+function closeMenusOutside(target: EventTarget | null) {
+ for (const menu of document.querySelectorAll<HTMLDetailsElement>('details[open]:not(.editor-group)')) if (!(target instanceof Node && menu.contains(target))) menu.open = false;
+}
+/** Clicks inside a prototype never reach this document; the window only sees focus move to the iframe. */
+function onBlur() { setTimeout(() => { if (document.activeElement instanceof HTMLIFrameElement) closeMenusOutside(document.activeElement); }); }
+function hasDraft(field: Element) {
+ if(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) return field.value !== field.defaultValue;
+ return field instanceof HTMLElement && field.isContentEditable && !!field.textContent?.trim();
+}
+function isCanvasTarget(target: EventTarget | null) {
+ return target === document.body || target === document.documentElement || (target instanceof Element && target.matches('.canvas,.world,.frame'));
+}
 function onKey(event:KeyboardEvent) {
- if(event.key==='Escape') { setMode('interact'); update({target:undefined,info:undefined,comments:false,inspector:false,compare:undefined}); leavePresentation(); }
- if(event.target instanceof HTMLElement && event.target.closest('input,textarea,select,[contenteditable],form')) return;
+ const field = event.target instanceof Element ? event.target.closest('input,textarea,select,[contenteditable]') : null;
+ if(event.key==='Escape') {
+  if(field instanceof HTMLElement && hasDraft(field)) { field.blur(); event.preventDefault(); return; }
+  if(closeLayer()) event.preventDefault();
+  return;
+ }
+ if(field || (event.target instanceof Element && event.target.closest('form'))) return;
  if(presentationKey(event.key)) { event.preventDefault(); return; }
  if(event.key==='0') fit();
  const frame = state.workspace?.experiment.frames.find(frame => frame.id === state.selected);
- if (frame && event.key === 'Enter') present(frame.id);
+ if (frame && event.key === 'Enter' && isCanvasTarget(event.target) && !state.info && !state.compare && !state.newFrame) present(frame.id);
  const directions: Record<string, [number,number]> = {ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
  const direction = directions[event.key];
  if (frame && direction && !state.workspace?.readOnly && !state.presenting) { event.preventDefault(); const position = framePosition(frame); const step = event.shiftKey ? 1 : 10; setPosition(frame.id,{...position,x:position.x+direction[0]*step,y:position.y+direction[1]*step}); }
@@ -185,8 +257,18 @@ export function compareGroups(frames: Frame[]): CompareGroup[] {
  });
 }
 export function activeFeedback(): Feedback[] { return state.workspace?.feedback ?? []; }
+/** Numbers count every comment of a frame in creation order, resolved ones included, so resolving never renumbers the rest. */
+export function commentNumbers(feedback: Feedback[]) {
+ const counts = new Map<string, number>(), numbers = new Map<string, number>();
+ for (const comment of [...feedback].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
+  const next = (counts.get(comment.frameId) ?? 0) + 1;
+  counts.set(comment.frameId, next); numbers.set(comment.id, next);
+ }
+ return numbers;
+}
 export async function initialize() {
  window.addEventListener('message',onMessage); window.addEventListener('hashchange',readRoute); window.addEventListener('keydown',onKey);
+ window.addEventListener('pointerdown',event=>closeMenusOutside(event.target),true); window.addEventListener('blur',onBlur);
  if(window.__DRAFTROOM__) { acceptWorkspace(window.__DRAFTROOM__,true); return; }
  await refresh();
  const events = new EventSource('./api/events');

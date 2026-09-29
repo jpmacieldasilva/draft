@@ -1,15 +1,19 @@
 import type { ReactNode } from 'react';
 
-function inline(text: string): ReactNode[] {
+// Emphasis markers must hug their text (no inner edge spaces), so "2 * 3" and a stray "*" stay literal.
+const INLINE = /(`[^`]+`|\*\*(?=\S)[^*]*?\S\*\*|\*(?=[^\s*])[^*]*?[^\s*]\*|\*[^\s*]\*)/g;
+
+function inline(text: string, keyPrefix = ''): ReactNode[] {
  const parts: ReactNode[] = [];
- const pattern = /(\*\*[^*]+\*\*|`[^`]+`)/g;
  let last = 0;
- for (const match of text.matchAll(pattern)) {
+ for (const match of text.matchAll(INLINE)) {
   const index = match.index ?? 0;
   if (index > last) parts.push(text.slice(last, index));
   const token = match[0];
-  if (token.startsWith('**')) parts.push(<strong key={`${index}-b`}>{token.slice(2, -2)}</strong>);
-  else parts.push(<code key={`${index}-c`}>{token.slice(1, -1)}</code>);
+  const key = `${keyPrefix}${index}`;
+  if (token.startsWith('`')) parts.push(<code key={`${key}-c`}>{token.slice(1, -1)}</code>);
+  else if (token.startsWith('**')) parts.push(<strong key={`${key}-b`}>{inline(token.slice(2, -2), `${key}-b-`)}</strong>);
+  else parts.push(<em key={`${key}-i`}>{inline(token.slice(1, -1), `${key}-i-`)}</em>);
   last = index + token.length;
  }
  if (last < text.length) parts.push(text.slice(last));
