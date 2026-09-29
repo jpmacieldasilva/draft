@@ -42,3 +42,14 @@ Interface:
 10. Estado e papel do frame não aparecem no canvas. (`manifest.spec.ts` — "selos de estado e papel aparecem no cabeçalho do frame")
 11. Hipótese, critério, o que o frame testa e o sinal pretendido não aparecem para quem revisa. (`manifest.spec.ts` — "decisão, teste e sinal aparecem no painel de informações")
 12. O modo comparar aparece sem controle, mostra o par errado ou esconde o critério. (`manifest.spec.ts` — "comparar mostra controle e variante lado a lado com o critério")
+
+## Fase 3 — Estudo navegável e compartilhamento
+
+1. Um clique em `[data-draft-goto]` dentro do iframe não chega ao viewer por causa da sandbox, e a apresentação não muda de frame. (`nav.spec.ts` — "data-draft-goto navega entre frames na apresentação")
+2. `data-draft-goto` aponta para um frame inexistente e o viewer quebra ou navega para lugar nenhum sem avisar. (`nav.spec.ts` — "destino inexistente avisa e mantém o frame atual")
+3. Em Inspecionar ou Comentar, clicar num link de fluxo navega em vez de selecionar. (`nav.spec.ts` — "links de fluxo não navegam em Inspecionar")
+4. No canvas (fora da apresentação), o link de fluxo não faz nada visível. (`nav.spec.ts` — "no canvas o link de fluxo seleciona o destino")
+5. As setas do teclado não seguem `edges`, voltar não retorna ao frame anterior, ou um ciclo trava a navegação. (`nav.spec.ts` — "setas seguem edges, voltam pelo histórico e atravessam ciclos")
+6. Depois de clicar dentro do protótipo, o foco fica no iframe e as setas param de navegar. (mesmo cenário)
+7. A apresentação não mostra para onde o fluxo pode seguir. (`nav.spec.ts` — "apresentação lista os próximos passos do fluxo")
+8. O export perde as arestas ou os comentários, ou deixa resolver comentários no bundle somente leitura; não há como exportar sem comentários. (`nav.spec.ts` — "export leva arestas e comentários somente leitura")
