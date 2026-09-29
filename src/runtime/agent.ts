@@ -1,6 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import type { Feedback, PresenceActor } from '../protocol.js';
+import { translator, type Locale } from '../i18n.js';
 import { WorkspaceStore, confined, discoverExperiment, publicPath } from './workspace.js';
 
 export interface FeedbackItem { id: string; frameId: string; status: Feedback['status']; message: string; target: Feedback['target']; createdAt: string }
@@ -33,17 +34,9 @@ export function feedbackItems(feedback: Feedback[]): FeedbackItem[] {
   return feedback.map(item => ({ id: item.id, frameId: item.frameId, status: item.status, message: item.message, target: item.target, createdAt: item.createdAt }));
 }
 
-export function agentRules(folder: string) {
-  const quoted = JSON.stringify(folder);
-  return [
-    `Antes de editar um frame: draft presence claim ${quoted} <frameId> --label <seu nome>. Depois: draft presence clear ${quoted} <frameId>. Não edite frames com claimedBy de outra pessoa.`,
-    'Edite apenas arquivos dentro de frames/<frameId>/. Não mova nem renomeie frames; mantenha os ids do experiment.json.',
-    'HTML e CSS clássicos, scripts locais sem módulos ES. Sem rede: fetch, CDNs, fontes e imagens remotas são bloqueados pela CSP.',
-    'Coloque data-draftroom-id estável nos elementos que recebem comentários ou ajustes do Inspect.',
-    `Depois de atender um comentário: draft feedback resolve ${quoted} <id>.`,
-    'Não altere .draft/ diretamente: é estado local do viewer.',
-    'Estados de fluxo (state), papéis (role: control | variant, por group), decision e edges ficam no experiment.json. Preserve campos que você não conhece.',
-  ];
+export function agentRules(folder: string, locale: Locale) {
+  const t = translator(locale), quoted = JSON.stringify(folder);
+  return (['rules.claim', 'rules.scope', 'rules.html', 'rules.ids', 'rules.resolve', 'rules.state', 'rules.manifest'] as const).map(key => t(key, { folder: quoted }));
 }
 
 export async function buildContext(store: WorkspaceStore) {
@@ -72,6 +65,7 @@ export async function buildContext(store: WorkspaceStore) {
     feedback: feedbackItems(open),
     presence,
     diagnostics: workspace.diagnostics,
-    rules: agentRules(store.root),
+    ...(workspace.experiment.allowNetwork ? { allowNetwork: workspace.experiment.allowNetwork } : {}),
+    rules: agentRules(store.root, workspace.locale === 'en' ? 'en' : 'pt-BR'),
   };
 }

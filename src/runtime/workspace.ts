@@ -3,6 +3,7 @@ import { readFile, realpath, mkdir, writeFile, rename, appendFile, cp, access, l
 import path from 'node:path';
 import { SCHEMA_VERSION, type Experiment, type Frame, type Feedback, type Layout, type Target, type Workspace, type VisualEdit, type Connection, type PresenceActor, type PresenceState } from '../protocol.js';
 import { parseExperiment, serializeManifest, validateEdges } from './manifest.js';
+import { DEFAULT_LOCALE, normalizeLocale, type Locale } from '../i18n.js';
 import { applyEdit, isBaseline, mergeBaseline, revertBaseline, stylesheetsOf, type EditBaseline } from './prototype-writer.js';
 
 export class RequestError extends Error { constructor(message: string, public status = 400) { super(message); } }
@@ -21,6 +22,8 @@ const STATE_DIR = '.draft';
 const LEGACY_STATE_DIR = '.draftroom';
 const STATE_FILES = ['feedback.jsonl', 'layout.json', 'presence.json', 'edits.json'];
 async function readStateFile(root: string, filename: string) { const primary = await optionalText(root, `${STATE_DIR}/${filename}`); return primary || await optionalText(root, `${LEGACY_STATE_DIR}/${filename}`); }
+/** DRAFT_LANG wins over the manifest so a person can read a shared study in their own language. */
+export function resolveLocale(manifestLocale?: string): Locale { return normalizeLocale(process.env.DRAFT_LANG) ?? normalizeLocale(manifestLocale) ?? DEFAULT_LOCALE; }
 export function escapeHtml(value: string) { return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 async function exists(file: string) { try { await access(file); return true; } catch { return false; } }
 /** Copies legacy `.draftroom/` state into `.draft/` once; feedback logs are merged by eventId so nothing written by older versions is hidden. */
@@ -243,12 +246,54 @@ export class WorkspaceStore {
       try { const event: unknown = JSON.parse(line); if (record(event) && typeof event.id === 'string' && typeof event.frameId === 'string' && typeof event.message === 'string' && typeof event.createdAt === 'string' && typeof event.eventId === 'string') feedback.set(event.id, { event: event.event === 'resolved' ? 'resolved' : event.event === 'reopened' ? 'reopened' : 'created', id: event.id, eventId: event.eventId, frameId: event.frameId, message: event.message, createdAt: event.createdAt, status: event.status === 'resolved' ? 'resolved' : 'open', target: validateTarget(event.target) }); } catch { diagnostics.push('Uma linha inválida de feedback foi ignorada.'); }
     }
     const presence = (await this.loadPresence()).actors;
-    return { experiment, readme: await optionalText(this.root, 'README.md'), feedback: [...feedback.values()], layout, revision: createHash('sha256').update(layoutText).digest('hex'), token: this.token, readOnly: false, diagnostics, presence };
+    return { experiment, readme: await optionalText(this.root, 'README.md'), feedback: [...feedback.values()], layout, revision: createHash('sha256').update(layoutText).digest('hex'), token: this.token, readOnly: false, diagnostics, presence, locale: resolveLocale(experiment.locale) };
   }
   private async stateDirectory() { const directory = path.join(this.root, STATE_DIR); await mkdir(directory, { recursive: true }); if ((await lstat(directory)).isSymbolicLink()) throw new RequestError('A pasta de estado não pode ser um symlink.', 403); return confined(this.root, STATE_DIR); }
   private async atomic(relative: string, value: unknown) { const directory = await confined(this.root, path.dirname(relative)); const destination = path.join(directory, path.basename(relative)); try { await confined(this.root, relative); } catch (error) { if (error instanceof RequestError) throw error; } const temporary = `${destination}.${randomUUID()}.tmp`; await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { flag: 'wx' }); await rename(temporary, destination); }
   mutate(operation: () => Promise<void>): Promise<Workspace> { const result = this.queue.then(async () => { this.root = await realpath(this.root); await operation(); return this.snapshot(); }); this.queue = result.catch(() => {}); return result; }
   saveLayout(body: Record<string, unknown>) { return this.mutate(async () => { const workspace = await this.snapshot(); if (body.revision !== workspace.revision) throw new RequestError('A composição mudou. Recarregue antes de salvar.', 409); const { connections: _legacy, ...layout } = validateLayout(body.layout); await this.stateDirectory(); await this.atomic(`${STATE_DIR}/layout.json`, layout); }); }
+  async readSelection(): Promise<{ selection: Record<string, unknown> | null }> {
+    try { const value: unknown = JSON.parse(await optionalText(this.root, `${STATE_DIR}/selection.json`) || 'null'); return { selection: record(value) && typeof value.frameId === 'string' ? value : null }; } catch { return { selection: null }; }
+  }
+  async saveSelection(body: Record<string, unknown>) {
+    await this.stateDirectory();
+    if (body.frameId === null) { await this.atomic(`${STATE_DIR}/selection.json`, null); return { selection: null }; }
+    const { experiment } = await discoverExperiment(this.root);
+    if (typeof body.frameId !== 'string' || !experiment.frames.some(frame => frame.id === body.frameId)) throw new RequestError('Frame não encontrado.', 404);
+    const selection = { frameId: body.frameId, target: validateTarget(body.target), selectedAt: new Date().toISOString() };
+    await this.atomic(`${STATE_DIR}/selection.json`, selection);
+    return { selection };
+  }
+  /** Partial manifest update for agents: every field is validated before anything is written. */
+  updateManifest(body: Record<string, unknown>) { return this.mutate(async () => {
+    const { raw, experiment } = await this.readManifest();
+    if (body.title !== undefined) { if (typeof body.title !== 'string' || !body.title.trim() || body.title.length > 200) throw new RequestError('Título inválido.'); experiment.title = body.title.trim(); }
+    if (body.decision !== undefined) {
+      if (!record(body.decision)) throw new RequestError('decision precisa ser um objeto.');
+      const decision = { ...experiment.decision };
+      for (const field of ['hypothesis', 'criteria'] as const) { const value = body.decision[field]; if (value === undefined) continue; if (typeof value !== 'string' || value.length > 2000) throw new RequestError(`decision.${field} inválido.`); if (value.trim()) decision[field] = value.trim(); else delete decision[field]; }
+      experiment.decision = decision;
+    }
+    if (body.frames !== undefined) {
+      if (!Array.isArray(body.frames) || body.frames.length > 200) throw new RequestError('frames precisa ser uma lista.');
+      const limits = { state: 40, group: 80, tests: 2000, signal: 200 } as const;
+      for (const patch of body.frames) {
+        const frame = record(patch) ? experiment.frames.find(candidate => candidate.id === patch.id) : undefined;
+        if (!record(patch) || !frame) throw new RequestError(`Frame não encontrado: ${record(patch) ? String(patch.id) : '?'}.`, 404);
+        if (patch.title !== undefined) { if (typeof patch.title !== 'string' || !patch.title.trim() || patch.title.length > 200) throw new RequestError('Título inválido.'); frame.title = patch.title.trim(); }
+        if (patch.role !== undefined) { if (patch.role === null) delete frame.role; else if (patch.role === 'control' || patch.role === 'variant') frame.role = patch.role; else throw new RequestError('role precisa ser control, variant ou null.'); }
+        for (const field of Object.keys(limits) as Array<keyof typeof limits>) {
+          const value = patch[field];
+          if (value === undefined) continue;
+          if (value === null) { delete frame[field]; continue; }
+          if (typeof value !== 'string' || !value.trim() || value.length > limits[field]) throw new RequestError(`${field} inválido no frame ${frame.id}.`);
+          frame[field] = value.trim();
+        }
+      }
+    }
+    if (body.edges !== undefined) experiment.edges = validateEdges(body.edges, new Set(experiment.frames.map(frame => frame.id)));
+    await this.writeManifest(raw, experiment);
+  }); }
   saveEdges(body: Record<string, unknown>) { return this.mutate(async () => {
     const { raw, experiment } = await this.readManifest();
     const edges = validateEdges(body.edges, new Set(experiment.frames.map(frame => frame.id)));

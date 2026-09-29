@@ -2,22 +2,13 @@
 import path from 'node:path';
 import { startRuntime } from './server.js';
 import { exportWorkspace } from './export.js';
-import { createWorkspace, discoverExperiment, WorkspaceStore } from './workspace.js';
+import { createWorkspace, discoverExperiment, resolveLocale, WorkspaceStore } from './workspace.js';
+import { translator } from '../i18n.js';
+import { serveMcp } from './mcp.js';
 import { buildContext, feedbackItems } from './agent.js';
 
-const USAGE = [
-  'Uso:',
-  '  draft open [pasta]',
-  '  draft create <pasta> [título] [--flow]',
-  '  draft inspect [pasta]',
-  '  draft context [pasta]',
-  '  draft feedback list [pasta] [--open]',
-  '  draft feedback resolve|reopen <pasta> <id>',
-  '  draft presence claim <pasta> [frameId] [--label Agent] [--ttl 120] [--id <id>]',
-  '  draft presence clear <pasta> [frameId] [--id <id>]',
-  '  draft presence list [pasta]',
-  '  draft export <pasta> <destino> [--no-feedback]',
-].join('\n');
+const t = translator(resolveLocale());
+const USAGE = t('cli.usage');
 
 function parseArgs(cliArgs: string[]) {
   const flags: Record<string, string> = {};
@@ -41,13 +32,13 @@ const port = Number(process.env.DRAFT_PORT ?? process.env.PROTOFIELD_PORT ?? 417
 try {
   if (command === 'export') {
     const [folder, output] = rest;
-    if (!folder || !output) throw new Error('Uso: draft export <pasta> <destino> [--no-feedback]');
+    if (!folder || !output) throw new Error(USAGE);
     await exportWorkspace(path.resolve(folder), path.resolve(output), { feedback: flags['no-feedback'] !== 'true' });
-    console.log(`Bundle somente leitura: ${path.resolve(output)}`);
+    console.log(t('cli.exported', { path: path.resolve(output) }));
   } else if (command === 'create') {
     const [folder, title] = rest;
-    if (!folder) throw new Error('Uso: draft create <pasta> [título] [--flow]');
-    console.log(`Workspace criado: ${await createWorkspace(path.resolve(folder), title || 'Meu espaço', { flow: flags.flow === 'true' })}`);
+    if (!folder) throw new Error(USAGE);
+    console.log(t('cli.created', { path: await createWorkspace(path.resolve(folder), title || 'Meu espaço', { flow: flags.flow === 'true' }) }));
   } else if (command === 'inspect') {
     const discovery = await discoverExperiment(path.resolve(rest[0] ?? '.'));
     print({ generated: discovery.generated, experiment: discovery.experiment });
@@ -60,7 +51,7 @@ try {
       const workspace = await store.snapshot();
       print(feedbackItems(workspace.feedback.filter(item => flags.open !== 'true' || item.status === 'open')));
     } else if (sub === 'resolve' || sub === 'reopen') {
-      if (!id) throw new Error(`Uso: draft feedback ${sub} <pasta> <id>`);
+      if (!id) throw new Error(USAGE);
       const workspace = await store.feedback({ status: sub === 'resolve' ? 'resolved' : 'open' }, id);
       print(feedbackItems(workspace.feedback.filter(item => item.id === id))[0]);
     } else throw new Error(USAGE);
@@ -70,6 +61,8 @@ try {
     const shutdown = () => { void runtime.close().then(() => process.exit(0)); };
     process.once('SIGINT', shutdown);
     process.once('SIGTERM', shutdown);
+  } else if (command === 'mcp') {
+    await serveMcp(path.resolve(rest[0] ?? '.'));
   } else if (command === 'presence') {
     const [sub, folder, frameId] = rest;
     if (!folder && sub !== 'list') throw new Error(USAGE);
