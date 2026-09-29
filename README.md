@@ -26,11 +26,11 @@ Opens the included studio study (`examples/studio`). Copy that folder when you s
 ![Comments — pins and region notes next to the prototype](media/feedback.png)
 
 - **Compare** — live HTML alternatives on a local canvas (flow, minimap, viewport presets).
-- **Inspect** — try type, color, and spacing on the live frame. Treat Inspect tweaks as session exploration: confirm in the HTML after reload before you trust them.
+- **Inspect** — try type, color, and spacing on the live frame. The preview is temporary; **Salvar ajuste** writes the change into that frame's HTML (never into a stylesheet shared with other frames), and **Restaurar original** undoes only the declarations Draft wrote.
 - **Comment** — pin a point or drag a region next to the pixels.
 - **Share** — same folder via Git or zip; `draft export` builds a read-only bundle.
 
-Local state in `.draftroom/`.
+Local state (canvas layout, comments, presence, undo baselines) lives in `.draft/`. Folders from older versions with `.draftroom/` are migrated on open.
 
 Frame HTML/CSS under `frames/` is what you ship and hand off. Edit those files (or verify them after Inspect) when you need something to survive reload.
 

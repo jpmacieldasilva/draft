@@ -52,4 +52,4 @@ If you will change files under `frames/`, claim first so Inspect soft-locks for 
 
 Clear when done: `draft presence clear <workspace> <frameId>`.
 
-Local metadata lives in `.draftroom/` (layout, feedback, presence). Inspect persistence requires **Salvar ajuste** in the viewer — exploration alone does not rewrite HTML.
+Local metadata lives in `.draft/` (layout, feedback, presence). Inspect persistence requires **Salvar ajuste** in the viewer — exploration alone does not rewrite HTML.

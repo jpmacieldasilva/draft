@@ -26,7 +26,7 @@ Headless e2e is fine for CI. For UI changes, also verify in a real browser (canv
 
 1. Fork and branch from `main`.
 2. Keep changes focused; preserve existing behavior unless the PR explains why not.
-3. Add or update tests when behavior changes.
+3. Behavior changes need end-to-end coverage: list the failure modes in [tests/FAILURE-MODES.md](tests/FAILURE-MODES.md) first, add the Playwright scenarios in `tests/browser/`, then write the code. CI uploads `e2e-evidence/evidence.json` (file hashes before and after every scenario) and the Playwright report.
 4. UI changes should be verifiable in a real browser (canvas, presentation, inspect).
 
 ## What we will not merge (yet)

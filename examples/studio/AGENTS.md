@@ -4,7 +4,7 @@ This folder is a **portable Draft workspace** — prototypes and manifest only, 
 
 When the user wants to use Draft for **this folder**, follow the repository skill [`.cursor/skills/use-draft/SKILL.md`](../../.cursor/skills/use-draft/SKILL.md) but open **this directory** (`.`) instead of `examples/studio` or `canvas/`.
 
-1. **Preserve** every file in this workspace. Do not delete, move, or rewrite `experiment.json`, frames, or `.draftroom/` without explicit permission.
+1. **Preserve** every file in this workspace. Do not delete, move, or rewrite `experiment.json`, frames, or `.draft/` without explicit permission.
 2. **Validate** with `draft inspect .` when a runtime is available.
 3. **Locate a runtime** (in order):
    - `draft` on `PATH`
@@ -40,6 +40,6 @@ While a claim is active, Inspect is soft-locked on that frame (no **Salvar ajust
 | `experiment.json` | Frame list, titles, entry HTML, viewports |
 | `frames/` | One folder per prototype |
 | `README.md` | Context for this study |
-| `.draftroom/` | Local layout, feedback, presence, undo baselines (optional) |
+| `.draft/` | Local layout, feedback, presence, undo baselines (optional) |
 
-Inspect explores the live iframe; **Salvar ajuste** writes typography/spacing into the prototype HTML/CSS in `frames/`. Commit those files when the designer saves. `.draftroom/` holds layout, feedback, presence claims, and undo baselines only — not a second copy of the prototype.
+Inspect explores the live iframe; **Salvar ajuste** writes typography/spacing into the prototype HTML/CSS in `frames/`. Commit those files when the designer saves. `.draft/` holds layout, feedback, presence claims, and undo baselines only — not a second copy of the prototype.
