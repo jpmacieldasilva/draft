@@ -49,6 +49,14 @@ export function runCli(args: string[], env: Record<string, string> = {}): Promis
  });
 }
 
+export async function api(url: string, route: string, body: unknown) {
+ const workspace = await (await fetch(`${url}/api/workspace`)).json() as { token: string };
+ const response = await fetch(`${url}/api/${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Draft-Token': workspace.token }, body: JSON.stringify(body) });
+ return { status: response.status, body: await response.json() as Record<string, unknown> };
+}
+
+export const region = (label = 'Área') => ({ kind: 'region', label, rect: { x: 10, y: 10, width: 40, height: 40 } });
+
 interface Fixtures { workspace: string; studio: { folder: string; url: string; restart: (env?: Record<string, string>) => Promise<string> } }
 
 export const test = base.extend<Fixtures>({

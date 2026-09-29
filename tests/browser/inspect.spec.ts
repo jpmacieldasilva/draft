@@ -1,13 +1,8 @@
-import { test, expect, startViewer, runCli } from './harness';
+import { test, expect, startViewer, runCli, api } from './harness';
 import { readFile, writeFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-async function api(url: string, route: string, body: unknown) {
- const workspace = await (await fetch(`${url}/api/workspace`)).json() as { token: string };
- const response = await fetch(`${url}/api/${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Draft-Token': workspace.token }, body: JSON.stringify(body) });
- return { status: response.status, body: await response.json() as Record<string, unknown> };
-}
 const read = (folder: string, relative: string) => readFile(path.join(folder, relative), 'utf8');
 
 test('ajuste em CSS compartilhado fica só no frame editado', async ({ page, studio }) => {
