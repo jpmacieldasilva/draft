@@ -1,13 +1,14 @@
 import {useEffect, useState, type Dispatch, type SetStateAction, type ChangeEvent} from 'react';
 import type {Target} from '../protocol';
+import {t, type MessageKey} from '../i18n';
 import {activeClaim, iframes, mutate, snapshot} from './store';
 
 type Styles = Record<string,string>;
 interface EditorState {styles:Styles; changes:Styles; text?:string; changedText?:string; editableText:boolean; ready:boolean; error?:string; saved:boolean}
 interface EditorContext {frameId:string; target:Target; state:EditorState; setState:Dispatch<SetStateAction<EditorState>>}
 const EMPTY_STATE:EditorState={styles:{},changes:{},editableText:false,ready:false,saved:false};
-const NUMERIC_FIELDS=[['fontSize','Tamanho do texto'],['lineHeight','Altura de linha'],['padding','Espaço interno'],['margin','Margem'],['borderRadius','Raio dos cantos']];
-const SELECT_FIELDS:Record<string,{label:string;values:string[]}>={fontWeight:{label:'Peso do texto',values:['100','200','300','400','500','600','700','800','900','normal','bold']}};
+const NUMERIC_FIELDS=[['fontSize','editor.fontSize'],['lineHeight','editor.lineHeight'],['padding','editor.padding'],['margin','editor.margin'],['borderRadius','editor.borderRadius']] as const;
+const SELECT_FIELDS:Record<string,{label:MessageKey;values:string[]}>={fontWeight:{label:'editor.fontWeight',values:['100','200','300','400','500','600','700','800','900','normal','bold']}};
 function post(frameId:string,message:unknown) {iframes.get(frameId)?.contentWindow?.postMessage(message,'*');}
 function subscribeStyles(frameId:string,target:Target,setState:Dispatch<SetStateAction<EditorState>>) {
  setState(EMPTY_STATE);
@@ -55,29 +56,29 @@ export function VisualEditor({frameId,target}:{frameId:string;target:Target}) {
  const context={frameId,target,state,setState};
  if(target.kind!=='element')return null;
  if (claim) {
-  return <section className="visual-editor agent-locked" aria-label="Inspect bloqueado">
-   <header className="editor-header"><span className="selection-indicator locked" aria-hidden="true"/><div><span className="editor-eyebrow">Agent</span><strong>{claim.label}</strong></div></header>
-   <p className="editor-lock" role="status" title="Agent está neste frame">Agent está neste frame. Inspect desabilitado até o claim expirar ou ser liberado.</p>
+  return <section className="visual-editor agent-locked" aria-label={t('editor.lockedLabel')}>
+   <header className="editor-header"><span className="selection-indicator locked" aria-hidden="true"/><div><span className="editor-eyebrow">{t('frame.agent')}</span><strong>{claim.label}</strong></div></header>
+   <p className="editor-lock" role="status" title={t('frame.agentHere')}>{t('editor.locked')}</p>
   </section>;
  }
- return <section className="visual-editor" aria-label="Editar elemento">
-  <header className="editor-header"><span className="selection-indicator" aria-hidden="true"/><div><span className="editor-eyebrow">Selecionado</span><strong>{target.label}</strong></div></header>
-  {!state.ready&&<p className="editor-loading" role="status">Lendo propriedades do elemento…</p>}
+ return <section className="visual-editor" aria-label={t('editor.label')}>
+  <header className="editor-header"><span className="selection-indicator" aria-hidden="true"/><div><span className="editor-eyebrow">{t('editor.selected')}</span><strong>{target.label}</strong></div></header>
+  {!state.ready&&<p className="editor-loading" role="status">{t('editor.loading')}</p>}
   {state.ready&&<>
-   {state.editableText&&<label className="editor-text">Texto<textarea aria-label="Texto" value={state.changedText??state.text??''} rows={2} maxLength={8000} onChange={event=>changeText(context,event)}/></label>}
+   {state.editableText&&<label className="editor-text">{t('editor.text')}<textarea aria-label={t('editor.text')} value={state.changedText??state.text??''} rows={2} maxLength={8000} onChange={event=>changeText(context,event)}/></label>}
    {[
-    {title:'Tipografia',names:['fontSize','lineHeight','fontWeight'],open:true},
-    {title:'Aparência',names:['color','backgroundColor','borderRadius'],open:false},
-    {title:'Espaçamento',names:['padding','margin'],open:false}
+    {title:t('editor.typography'),names:['fontSize','lineHeight','fontWeight'],open:true},
+    {title:t('editor.appearance'),names:['color','backgroundColor','borderRadius'],open:false},
+    {title:t('editor.spacing'),names:['padding','margin'],open:false}
    ].map(group=><details className="editor-group" key={group.title} open={group.open}><summary>{group.title}</summary><div className="editor-fields">
-    {group.names.filter(name=>name==='color'||name==='backgroundColor').map(name=><label key={name}>{name==='color'?'Cor do texto':'Cor de fundo'}<input aria-label={name==='color'?'Cor do texto':'Cor de fundo'} value={state.changes[name]??state.styles[name]??''} placeholder="#334455" onChange={event=>changeStyle(context,name,event.currentTarget.value)}/></label>)}
-    {NUMERIC_FIELDS.filter(([name])=>group.names.includes(name)).map(([name,label])=><label key={name}>{label} (px)<input type="number" min={name==='margin'?-500:0} max={name==='width'||name==='height'?10000:500} step="1" placeholder="Automático" value={numericValue(state.changes[name]??state.styles[name])} onChange={event=>changeNumber(context,name,event)}/></label>)}
-    {Object.entries(SELECT_FIELDS).filter(([name])=>group.names.includes(name)).map(([name,field])=><label key={name}>{field.label}<select value={state.changes[name]??state.styles[name]??''} onChange={event=>changeStyle(context,name,event.currentTarget.value)}>{!field.values.includes(state.styles[name])&&<option value={state.styles[name]??''}>{state.styles[name]??'Padrão'}</option>}{field.values.map(value=><option key={value} value={value}>{value}</option>)}</select></label>)}
+    {group.names.filter(name=>name==='color'||name==='backgroundColor').map(name=><label key={name}>{t(name==='color'?'editor.textColor':'editor.backgroundColor')}<input aria-label={t(name==='color'?'editor.textColor':'editor.backgroundColor')} value={state.changes[name]??state.styles[name]??''} placeholder="#334455" onChange={event=>changeStyle(context,name,event.currentTarget.value)}/></label>)}
+    {NUMERIC_FIELDS.filter(([name])=>group.names.includes(name)).map(([name,label])=><label key={name}>{t(label)} (px)<input type="number" min={name==='margin'?-500:0} max={500} step="1" placeholder={t('editor.auto')} value={numericValue(state.changes[name]??state.styles[name])} onChange={event=>changeNumber(context,name,event)}/></label>)}
+    {Object.entries(SELECT_FIELDS).filter(([name])=>group.names.includes(name)).map(([name,field])=><label key={name}>{t(field.label)}<select value={state.changes[name]??state.styles[name]??''} onChange={event=>changeStyle(context,name,event.currentTarget.value)}>{!field.values.includes(state.styles[name])&&<option value={state.styles[name]??''}>{state.styles[name]??t('editor.default')}</option>}{field.values.map(value=><option key={value} value={value}>{value}</option>)}</select></label>)}
    </div></details>)}
    {state.error&&<p role="alert">{state.error}</p>}
-   {state.saved&&<p role="status">Ajuste salvo.</p>}
-   <footer className="editor-actions"><button type="button" onClick={()=>reset(context)} disabled={!Object.keys(state.changes).length&&state.changedText===undefined}>Desfazer prévia</button><button type="button" className="primary" disabled={snapshot().busy||!!state.error||(!Object.keys(state.changes).length&&state.changedText===undefined)} onClick={()=>void save(context)}>Salvar ajuste</button></footer>
-   <button type="button" className="restore-original" onClick={()=>void restoreOriginal(context)}>Restaurar original</button>
+   {state.saved&&<p role="status">{t('editor.saved')}</p>}
+   <footer className="editor-actions"><button type="button" onClick={()=>reset(context)} disabled={!Object.keys(state.changes).length&&state.changedText===undefined}>{t('editor.undoPreview')}</button><button type="button" className="primary" disabled={snapshot().busy||!!state.error||(!Object.keys(state.changes).length&&state.changedText===undefined)} onClick={()=>void save(context)}>{t('editor.save')}</button></footer>
+   <button type="button" className="restore-original" onClick={()=>void restoreOriginal(context)}>{t('editor.restore')}</button>
 
   </>}
  </section>;

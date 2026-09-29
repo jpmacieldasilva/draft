@@ -41,15 +41,20 @@ The user wants to **use Draft**: run the viewer, open the canvas, preview or exp
 ## Limits
 
 - Classic HTML/CSS/JS in sandboxed iframes; modules and storage APIs are not guaranteed.
-- Read-only export bundles cannot persist feedback.
+- Read-only export bundles show comments but cannot create or resolve them.
+- Link frames with `data-draft-goto="<frameId>"` on any element; presentation mode follows it and the arrow keys follow `edges`.
 - `canvas/` in an app is for prototypes only; it does not generate app code.
 
-## Agent presence (when editing frames)
+## Working on frames (contract)
 
-If you will change files under `frames/`, claim first so Inspect soft-locks for humans:
+When the user asks you to change prototypes or act on comments, follow this loop. Replace `draft` with `node <draft-clone>/dist/runtime/cli.js` if it is not on `PATH`.
 
-`draft presence claim <workspace> <frameId> --label Agent --ttl 120`
+1. **Read first:** `draft context <workspace>`. It prints the manifest, READMEs, each frame's files, open comments (with frame, selector and message), active claims, and the emission rules. Do not generate HTML before reading it.
+2. **Claim:** `draft presence claim <workspace> <frameId> --label <your name> --ttl 120`. Skip frames whose `claimedBy` is someone else.
+3. **Edit** only files under `frames/<frameId>/`. Classic HTML/CSS and local scripts; no ES modules, no network (CDNs, remote fonts and images are blocked unless the host is listed in `allowNetwork` in `experiment.json`). Add a stable `data-draftroom-id` to elements that get comments or Inspect tweaks.
+4. **Resolve** each comment you addressed: `draft feedback resolve <workspace> <id>`. List what is still open with `draft feedback list <workspace> --open`.
+5. **Release:** `draft presence clear <workspace> <frameId>`.
 
-Clear when done: `draft presence clear <workspace> <frameId>`.
+If the client supports MCP, `draft mcp <workspace>` offers the same loop as tools (`get_context`, `get_selection` for what the user has selected in the viewer, `claim`, `write_frame`, `resolve_feedback`, `release`, `update_manifest`).
 
-Local metadata lives in `.draftroom/` (layout, feedback, presence). Inspect persistence requires **Salvar ajuste** in the viewer — exploration alone does not rewrite HTML.
+The open viewer reloads edited frames and updates comments by itself. Local metadata lives in `.draft/` (layout, feedback, presence, undo baselines); never edit it by hand. Inspect writes to the frame's HTML only when the user presses **Salvar ajuste**.
