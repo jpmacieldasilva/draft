@@ -53,3 +53,33 @@ Interface:
 6. Depois de clicar dentro do protótipo, o foco fica no iframe e as setas param de navegar. (mesmo cenário)
 7. A apresentação não mostra para onde o fluxo pode seguir. (`nav.spec.ts` — "apresentação lista os próximos passos do fluxo")
 8. O export perde as arestas ou os comentários, ou deixa resolver comentários no bundle somente leitura; não há como exportar sem comentários. (`nav.spec.ts` — "export leva arestas e comentários somente leitura")
+
+## Fase 4 — Distribuição, idioma, MCP e rede
+
+Distribuição:
+
+1. O pacote continua `private` ou o tarball não leva `dist/`, a ponte do iframe ou o exemplo, e `npx draft-viewer` quebra depois de instalado. (`dist.spec.ts` — "tarball instalado abre o viewer e roda o CLI")
+2. O tarball leva coisas que não deveria: `src/`, `tests/`, `.draft/`, evidências. (mesmo cenário)
+
+Idioma:
+
+3. Com `DRAFT_LANG=en`, o viewer ou o CLI continuam em português. (`dist.spec.ts` — "DRAFT_LANG=en troca viewer e CLI para inglês")
+4. `"locale": "en"` no manifesto é ignorado. (`dist.spec.ts` — "locale do manifesto escolhe o idioma")
+5. Um idioma desconhecido quebra a interface ou mostra chaves cruas. (`dist.spec.ts` — "idioma desconhecido cai em pt-BR")
+6. Uma string existe em um idioma e falta no outro. (coberto em tempo de compilação: o dicionário `en` precisa ter as mesmas chaves que `pt-BR`; `npm run check` falha)
+
+MCP:
+
+7. `draft mcp` não sobe ou não expõe as ferramentas. (`mcp.spec.ts` — "servidor MCP lista as ferramentas do Draft")
+8. `write_frame` grava fora de `frames/<id>/` (`../`, caminho absoluto, dotfile, outro frame) ou num tipo de arquivo privado. (`mcp.spec.ts` — "write_frame recusa caminhos fora do frame")
+9. `write_frame` grava num frame reivindicado por outro ator. (`mcp.spec.ts` — "write_frame respeita claims de outros atores")
+10. `get_selection` devolve algo velho ou inventado: sem seleção deve ser `null`; depois de selecionar no Inspect deve trazer frame e seletor. (`mcp.spec.ts` — "get_selection segue a seleção do viewer e write_frame recarrega o frame")
+11. Um frame gravado pelo MCP não recarrega no viewer aberto. (mesmo cenário)
+12. `update_manifest` aceita aresta inválida ou frame inexistente, ou apaga campos desconhecidos. (`mcp.spec.ts` — "update_manifest valida e preserva campos desconhecidos")
+13. `resolve_feedback` com id inexistente derruba o servidor em vez de devolver erro. (`mcp.spec.ts` — "resolve_feedback com id inexistente devolve erro")
+
+Rede:
+
+14. Um recurso remoto é bloqueado pela CSP e ninguém fica sabendo. (`network.spec.ts` — "recurso remoto bloqueado mostra aviso no frame")
+15. `allowNetwork` aceita curinga, esquema, espaço ou palavra-chave de CSP e alarga a política. (`network.spec.ts` — "allowNetwork recusa entradas perigosas")
+16. Um host liberado em `allowNetwork` continua bloqueado ou gera aviso. (`network.spec.ts` — "host liberado entra na CSP e não gera aviso")
