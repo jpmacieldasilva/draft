@@ -206,7 +206,6 @@ test('edita visualmente, preserva ajustes sucessivos e restaura o original',asyn
  await expect(title).toHaveCSS('font-size','30px');
  await page.getByRole('button',{name:'Salvar ajuste',exact:true}).click();
  await expect(page.getByText('Ajuste salvo.',{exact:true})).toBeVisible();
- await page.getByText('Espaçamento',{exact:true}).click();
  await page.getByRole('spinbutton',{name:'Espaço interno (px)',exact:true}).fill('12');
  await page.getByRole('button',{name:'Salvar ajuste',exact:true}).click();
  await expect.poll(async()=>/padding:\s*12px/i.test(await readFile(path.join(folder,'frames/editorial/index.html'),'utf8'))).toBe(true);

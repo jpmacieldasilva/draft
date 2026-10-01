@@ -38,7 +38,7 @@ draft presence clear . <frameId>                   # 5. release the frame
 - Put a stable `data-draftroom-id` on elements that receive comments or Inspect tweaks.
 - `draft feedback list . --open` shows what is still pending.
 
-While a claim is active, Inspect is soft-locked on that frame (no **Salvar ajuste**). The ring and **Agent** pill only signal presence — they are not the lock.
+While a claim is active, that frame shows a ring and an **Agent** pill, and Inspect is blocked (no **Salvar ajuste**) until the claim expires or is released.
 
 ## What lives here
 
@@ -49,4 +49,4 @@ While a claim is active, Inspect is soft-locked on that frame (no **Salvar ajust
 | `README.md` | Context for this study |
 | `.draft/` | Local layout, feedback, presence, undo baselines (optional) |
 
-Inspect explores the live iframe; **Salvar ajuste** writes typography/spacing into the prototype HTML/CSS in `frames/`. Commit those files when the designer saves. `.draft/` holds layout, feedback, presence claims, and undo baselines only — not a second copy of the prototype.
+Inspect previews on the live frame. **Salvar ajuste** writes type, color, and spacing into that frame's HTML (or a stylesheet that belongs only to it). The change survives reload. Commit those files when the designer saves. `.draft/` holds layout, feedback, presence claims, and undo baselines only — not a second copy of the prototype.

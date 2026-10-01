@@ -29,9 +29,19 @@
       const number=Number(value.replace(/px$/,'')); return /^-?\d+(\.\d+)?px$/.test(value)&&Number.isFinite(number)&&number>=limits[name][0]&&number<=limits[name][1];
     });
   }
+  function elementRect(element) {
+    const rect=element.getBoundingClientRect();
+    return {x:rect.x,y:rect.y,width:Math.max(1,rect.width),height:Math.max(1,rect.height)};
+  }
   function report(element, error) {
     const computed=getComputedStyle(element);
-    parent.postMessage({type:'draftroom:styles',selector:selector(element),styles:Object.fromEntries(properties.map(name=>[name,computed[name]])),text:element.childElementCount===0?element.textContent:undefined,editableText:element.childElementCount===0,error},'*');
+    parent.postMessage({type:'draftroom:styles',selector:selector(element),styles:Object.fromEntries(properties.map(name=>[name,computed[name]])),text:element.childElementCount===0?element.textContent:undefined,editableText:element.childElementCount===0,rect:elementRect(element),error},'*');
+  }
+  let rectFrame=0;
+  function publishRect() {
+    if(!selected) return;
+    cancelAnimationFrame(rectFrame);
+    rectFrame=requestAnimationFrame(()=>{ if(selected) parent.postMessage({type:'draftroom:rect',selector:selector(selected),rect:elementRect(selected)},'*'); });
   }
   function revert() { originals.forEach((original,element)=>{ if(original.style===null) element.removeAttribute('style'); else element.setAttribute('style',original.style); if(original.text!==undefined) element.textContent=original.text; }); originals=new Map(); }
   function prepareTypography(element, styles) {
@@ -101,6 +111,8 @@
     const editable=event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable]');
     if((event.key==='ArrowLeft'||event.key==='ArrowRight')&&!editable&&!event.altKey&&!event.ctrlKey&&!event.metaKey) parent.postMessage({type:'draftroom:key',key:event.key},'*');
   },true);
+  addEventListener('scroll',()=>{ if(selected) publishRect(); },true);
+  addEventListener('resize',()=>{ if(selected) publishRect(); });
   document.addEventListener('securitypolicyviolation',event=>{
     if(/^https?:/.test(event.blockedURI)) parent.postMessage({type:'draftroom:blocked',uri:event.blockedURI.slice(0,500)},'*');
   });

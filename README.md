@@ -33,14 +33,14 @@ Opens the included studio study (`examples/studio`). Copy that folder when you s
 ![Comments — pins and region notes next to the prototype](media/feedback.png)
 
 - **Compare** — live HTML alternatives on a local canvas (flow, minimap, viewport presets).
-- **Inspect** — try type, color, and spacing on the live frame. The preview is temporary; **Salvar ajuste** writes the change into that frame's HTML (never into a stylesheet shared with other frames), and **Restaurar original** undoes only the declarations Draft wrote.
+- **Inspect** — select an element and edit type, color, and spacing in a thin panel on that element. The preview is temporary; **Salvar ajuste** writes the change into that frame's HTML (never into a stylesheet shared with other frames) and a full reload shows the same result. **Restaurar original** undoes only the declarations Draft wrote. While another actor's claim is active, the frame shows a ring and an **Agent** pill and Inspect stays blocked.
 - **Comment** — pin a point or drag a region next to the pixels.
 - **Present the flow** — in presentation mode, arrow keys follow `edges` (← goes back), the bar lists the next steps, and any element with `data-draft-goto="<frameId>"` inside a prototype jumps to that frame. On the canvas the same link selects and centers the target.
 - **Share** — same folder via Git or zip; `draft export` builds a read-only bundle with the flow and the comments (add `--no-feedback` to leave comments out).
 
 Local state (canvas layout, comments, presence, undo baselines) lives in `.draft/`. Folders from older versions with `.draftroom/` are migrated on open.
 
-Frame HTML/CSS under `frames/` is what you ship and hand off. Edit those files (or verify them after Inspect) when you need something to survive reload.
+Frame HTML/CSS under `frames/` is what you ship and hand off. After **Salvar ajuste**, the change is already in that frame and survives reload.
 
 ## Designer — workspace only
 

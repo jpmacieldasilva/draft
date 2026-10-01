@@ -83,3 +83,10 @@ Rede:
 14. Um recurso remoto é bloqueado pela CSP e ninguém fica sabendo. (`network.spec.ts` — "recurso remoto bloqueado mostra aviso no frame")
 15. `allowNetwork` aceita curinga, esquema, espaço ou palavra-chave de CSP e alarga a política. (`network.spec.ts` — "allowNetwork recusa entradas perigosas")
 16. Um host liberado em `allowNetwork` continua bloqueado ou gera aviso. (`network.spec.ts` — "host liberado entra na CSP e não gera aviso")
+
+## Inspect no elemento
+
+1. A prévia parece salva, mas o reload volta o frame e o HTML não muda. (`inspect.spec.ts` — "prévia sem salvar some no reload e não entra no frame")
+2. O painel de Inspect fica numa gaveta longe do elemento, ou a cor salva não sobrevive ao reload. (`inspect.spec.ts` — "painel flutua no elemento e a cor salva sobrevive ao reload")
+3. Arrastar o espaço interno não grava padding no frame. (`inspect.spec.ts` — "alça de espaço interno grava padding que sobrevive ao reload")
+4. Com claim ativo o Inspect continua editável, ou some o anel e a pílula Agent. (`inspect.spec.ts` — "claim ativo bloqueia o Inspect e mostra o Agent")

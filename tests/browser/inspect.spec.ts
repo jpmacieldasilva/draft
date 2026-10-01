@@ -5,6 +5,84 @@ import path from 'node:path';
 
 const read = (folder: string, relative: string) => readFile(path.join(folder, relative), 'utf8');
 
+test('prévia sem salvar some no reload e não entra no frame', async ({ page, studio }) => {
+ const before = await read(studio.folder, 'frames/editorial/index.html');
+ await page.goto(studio.url);
+ const title = page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('heading', { name: 'A arte de prestar atenção', exact: true });
+ await page.getByRole('button', { name: 'Inspecionar', exact: false }).click();
+ await title.click();
+ await page.getByRole('spinbutton', { name: 'Tamanho do texto (px)', exact: true }).fill('48');
+ await expect(title).toHaveCSS('font-size', '48px');
+ await expect(page.getByText('Prévia. Salvar grava no frame.', { exact: true })).toBeVisible();
+ await page.reload();
+ await expect(title).toHaveCSS('font-size', '23px');
+ expect(await read(studio.folder, 'frames/editorial/index.html')).toBe(before);
+});
+
+test('painel flutua no elemento e a cor salva sobrevive ao reload', async ({ page, studio }) => {
+ const sharedBefore = await read(studio.folder, 'shared/style.css');
+ await page.goto(studio.url);
+ const title = page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('heading', { name: 'A arte de prestar atenção', exact: true });
+ await page.getByRole('button', { name: 'Inspecionar', exact: false }).click();
+ await title.click();
+ const panel = page.getByRole('complementary', { name: 'Inspector' });
+ await expect(panel).toBeVisible();
+ await expect(panel).not.toHaveClass(/side-panel/);
+ const titleBox = await title.boundingBox();
+ const panelBox = await panel.boundingBox();
+ if (!titleBox || !panelBox) throw new Error('painel ou título sem caixa');
+ const dx = Math.max(0, titleBox.x - (panelBox.x + panelBox.width), panelBox.x - (titleBox.x + titleBox.width));
+ const dy = Math.max(0, titleBox.y - (panelBox.y + panelBox.height), panelBox.y - (titleBox.y + titleBox.height));
+ expect(Math.hypot(dx, dy)).toBeLessThan(48);
+ await page.getByLabel('Cor do texto').fill('#112233');
+ await expect(title).toHaveCSS('color', 'rgb(17, 34, 51)');
+ await page.getByRole('button', { name: 'Salvar ajuste', exact: true }).click();
+ await expect(page.getByText('Ajuste salvo.', { exact: true })).toBeVisible();
+ await expect.poll(async () => /#112233/i.test(await read(studio.folder, 'frames/editorial/index.html'))).toBe(true);
+ expect(await read(studio.folder, 'shared/style.css')).toBe(sharedBefore);
+ await page.reload();
+ await expect(title).toHaveCSS('color', 'rgb(17, 34, 51)');
+});
+
+test('alça de espaço interno grava padding que sobrevive ao reload', async ({ page, studio }) => {
+ await page.goto(studio.url);
+ const title = page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('heading', { name: 'A arte de prestar atenção', exact: true });
+ await page.getByRole('button', { name: 'Inspecionar', exact: false }).click();
+ await title.click();
+ const handle = page.getByRole('button', { name: 'Espaço interno abaixo', exact: true });
+ await expect(handle).toBeVisible();
+ const box = await handle.boundingBox();
+ if (!box) throw new Error('alça sem caixa');
+ await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+ await page.mouse.down();
+ await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 36, { steps: 8 });
+ await page.mouse.up();
+ const padding = Number(await page.getByRole('spinbutton', { name: 'Espaço interno (px)', exact: true }).inputValue());
+ expect(padding).toBeGreaterThan(8);
+ await page.getByRole('button', { name: 'Salvar ajuste', exact: true }).click();
+ await expect(page.getByText('Ajuste salvo.', { exact: true })).toBeVisible();
+ await page.reload();
+ await expect(title).toHaveCSS('padding-top', `${padding}px`);
+});
+
+test('claim ativo bloqueia o Inspect e mostra o Agent', async ({ page, studio }) => {
+ await page.goto(studio.url);
+ await page.getByRole('button', { name: 'Inspecionar', exact: false }).click();
+ await page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('heading', { name: 'A arte de prestar atenção', exact: true }).click();
+ await expect(page.getByRole('button', { name: 'Salvar ajuste', exact: true })).toBeVisible();
+ expect((await runCli(['presence', 'claim', studio.folder, 'editorial', '--label', 'Agent', '--ttl', '120'])).code).toBe(0);
+ const frame = page.locator('article[aria-label="Biblioteca editorial"]');
+ await expect(frame).toHaveClass(/agent-active/);
+ await expect(frame.locator('.agent-pill')).toHaveText('Agent');
+ await expect(page.getByRole('complementary', { name: 'Inspector' })).toContainText('Inspect desabilitado');
+ await expect(page.getByRole('button', { name: 'Salvar ajuste', exact: true })).toHaveCount(0);
+ const before = await read(studio.folder, 'frames/editorial/index.html');
+ const blocked = await api(studio.url, 'edits', { frameId: 'editorial', selector: '[data-draftroom-id="featured-title"]', styles: { fontSize: '40px' } });
+ expect(blocked.status).toBe(409);
+ expect(String(blocked.body.error)).toMatch(/Agent está neste frame/);
+ expect(await read(studio.folder, 'frames/editorial/index.html')).toBe(before);
+});
+
 test('ajuste em CSS compartilhado fica só no frame editado', async ({ page, studio }) => {
  const sharedBefore = await read(studio.folder, 'shared/style.css');
  await page.goto(studio.url);
