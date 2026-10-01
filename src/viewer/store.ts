@@ -1,5 +1,5 @@
 import { normalizeLocale, setLocale, t, DEFAULT_LOCALE } from '../i18n';
-import type { Feedback, Frame, Layout, Position, PresenceActor, Target, Workspace } from '../protocol';
+import type { Feedback, Frame, Layout, Position, PresenceActor, Rect, Target, Workspace } from '../protocol';
 declare global { interface Window { __DRAFTROOM__?: Workspace } }
 export type Mode = 'interact' | 'element' | 'comment';
 interface State { workspace?: Workspace; layout: Layout; mode: Mode; selected?: string; presenting?: string; info?: string; target?: {frameId: string; target: Target}; feedback?: string; error?: string; busy: boolean; comments: boolean; inspector: boolean; newFrame?: boolean; notice?: string; compare?: { group: string; variant?: string }; blocked: Record<string, string[]> }
@@ -86,6 +86,8 @@ export function setMode(mode: Mode) { update({mode}); iframes.forEach(iframe => 
 export function syncBridge(frameId: string) {
  const frame=iframes.get(frameId)?.contentWindow;
  frame?.postMessage({type:'draftroom:mode',mode:state.mode}, '*');
+ const selected=state.target;
+ if(selected?.frameId===frameId && state.inspector && selected.target.kind==='element' && selected.target.selector && !activeClaim(frameId)) frame?.postMessage({type:'draftroom:inspect',selector:selected.target.selector}, '*');
 }
 let trail: string[] = [];
 export function present(frameId: string, fromFlow = false) { if(!fromFlow) trail = []; update({presenting:frameId, selected:frameId, info:undefined}); location.hash = `frame/${encodeURIComponent(frameId)}`; }
@@ -124,6 +126,21 @@ function shareSelection(frameId: string, target: Target) {
  void fetch('./api/selection',{method:'POST',headers:{'Content-Type':'application/json','X-Draft-Token':state.workspace?.token ?? ''},body:JSON.stringify({frameId,target})}).catch(()=>undefined);
 }
 function blockedHost(uri: string) { try { return new URL(uri).host || uri; } catch { return uri.slice(0, 200); } }
+function readRect(value: unknown): Rect | undefined {
+ if(!value || typeof value !== 'object') return;
+ const source = value as Record<string, unknown>;
+ const rect = { x: source.x, y: source.y, width: source.width, height: source.height };
+ if(!['x','y','width','height'].every(key => { const number = rect[key as keyof Rect]; return typeof number === 'number' && Number.isFinite(number) && Math.abs(number) < 100000; })) return;
+ return rect as Rect;
+}
+function sameRect(a: Rect, b: Rect) { return Math.abs(a.x-b.x)<0.5 && Math.abs(a.y-b.y)<0.5 && Math.abs(a.width-b.width)<0.5 && Math.abs(a.height-b.height)<0.5; }
+function trackInspectRect(frameId: string, data: object) {
+ if(!('selector' in data) || !('rect' in data)) return;
+ const current = state.target;
+ const rect = readRect(data.rect);
+ if(!rect || current?.frameId!==frameId || current.target.kind!=='element' || current.target.selector!==data.selector || sameRect(current.target.rect, rect)) return;
+ update({ target: { frameId, target: { ...current.target, rect } } });
+}
 function isTarget(value: unknown): value is Target {
  if(!value || typeof value !== 'object' || !('kind' in value) || !('rect' in value) || !('label' in value)) return false;
  if(value.kind !== 'element' && value.kind !== 'region' || typeof value.label !== 'string' || value.label.length > 500) return false;
@@ -146,6 +163,7 @@ function onMessage(event:MessageEvent<unknown>) {
   if(state.mode==='element' && target.kind==='element') selectInspectTarget(frame[0], target);
   if(state.mode==='comment' && target.kind==='region') selectCommentTarget(frame[0], target);
  }
+ if((event.data.type==='draftroom:styles' || event.data.type==='draftroom:rect') && state.inspector) trackInspectRect(frame[0], event.data);
 }
 function onKey(event:KeyboardEvent) {
  if(event.key==='Escape') { setMode('interact'); update({target:undefined,info:undefined,comments:false,inspector:false,compare:undefined}); leavePresentation(); }

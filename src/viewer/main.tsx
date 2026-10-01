@@ -127,10 +127,8 @@ function Compare() {
 }
 function InspectorPanel() {
  const state=useStore();
- if(!state.inspector || state.target?.target.kind!=='element') return null;
- return <aside className="side-panel inspector-panel" aria-label={t('inspector.title')}><header><h2>{t('inspector.title')}</h2><button aria-label={t('inspector.close')} onClick={()=>update({inspector:false,target:undefined})}><X/></button></header>
-  <VisualEditor key={`${state.target.frameId}:${state.target.target.selector}`} frameId={state.target.frameId} target={state.target.target}/>
- </aside>;
+ if(!state.inspector || state.target?.target.kind!=='element' || !state.target.target.selector) return null;
+ return <VisualEditor key={`${state.target.frameId}:${state.target.target.selector}`} frameId={state.target.frameId} target={state.target.target} onClose={()=>update({inspector:false,target:undefined})}/>;
 }
 function Comments() {
  const state=useStore(); if(!state.comments) return null;

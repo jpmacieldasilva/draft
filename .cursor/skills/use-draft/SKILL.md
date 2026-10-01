@@ -57,4 +57,4 @@ When the user asks you to change prototypes or act on comments, follow this loop
 
 If the client supports MCP, `draft mcp <workspace>` offers the same loop as tools (`get_context`, `get_selection` for what the user has selected in the viewer, `claim`, `write_frame`, `resolve_feedback`, `release`, `update_manifest`).
 
-The open viewer reloads edited frames and updates comments by itself. Local metadata lives in `.draft/` (layout, feedback, presence, undo baselines); never edit it by hand. Inspect writes to the frame's HTML only when the user presses **Salvar ajuste**.
+The open viewer reloads edited frames and updates comments by itself. Local metadata lives in `.draft/` (layout, feedback, presence, undo baselines); never edit it by hand. Inspect previews on the element; it writes that frame's HTML only when the user presses **Salvar ajuste**. A preview is not in the file until then. While a claim is active, Inspect on that frame stays blocked.

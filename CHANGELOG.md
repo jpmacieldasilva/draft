@@ -8,6 +8,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
+- Inspect edits type, color, and spacing from a floating panel on the selected element. **Salvar ajuste** still writes into that frame's HTML and survives reload; an unsaved preview does not. An active claim keeps the ring and **Agent** pill and blocks Inspect.
 - **Breaking:** flow connections are stored in `experiment.json` (`edges`) instead of `.draft/layout.json`, so they are shared through Git. Existing connections are migrated on open. `POST /api/edges` replaces the layout field.
 
 ### Fixed
