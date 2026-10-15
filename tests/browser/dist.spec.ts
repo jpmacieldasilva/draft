@@ -55,7 +55,9 @@ test('DRAFT_LANG=en troca viewer e CLI para inglês', async ({ page, workspace }
   await expect(page.getByRole('button', { name: 'Inspect', exact: false })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Comment', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add prototype', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: /^Comments/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Connect an agent', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: /^Comments/ })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await page.getByRole('button', { name: 'Add prototype', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Add prototype' })).toContainText('Create prototype');

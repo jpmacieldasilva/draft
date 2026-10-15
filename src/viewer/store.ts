@@ -1,14 +1,14 @@
 import { normalizeLocale, setLocale, t, DEFAULT_LOCALE } from '../i18n';
 import type { Feedback, Frame, Layout, Position, PresenceActor, Target, Workspace } from '../protocol';
 declare global { interface Window { __DRAFTROOM__?: Workspace } }
-export type Mode = 'interact' | 'element' | 'comment';
-interface State { workspace?: Workspace; layout: Layout; mode: Mode; selected?: string; presenting?: string; info?: string; target?: {frameId: string; target: Target}; feedback?: string; error?: string; busy: boolean; comments: boolean; inspector: boolean; newFrame?: boolean; notice?: string; compare?: { group: string; variant?: string }; blocked: Record<string, string[]>; statusOpen: boolean; connectOpen: boolean; historyFrame?: string; code: Record<string, boolean> }
+export type Mode = 'interact' | 'element' | 'comment' | 'pan';
+interface State { workspace?: Workspace; layout: Layout; mode: Mode; selected?: string; presenting?: string; target?: {frameId: string; target: Target}; feedback?: string; error?: string; busy: boolean; comments: boolean; inspector: boolean; newFrame?: boolean; notice?: string; blocked: Record<string, string[]>; statusOpen: boolean; connectOpen: boolean; settingsOpen: boolean; historyFrame?: string; code: Record<string, boolean> }
 const listeners = new Set<() => void>();
 let layoutDirty = false;
 let layoutRevision = '';
 let layoutVersion = 0;
 let layoutSaving = false;
-let state: State = { layout: { frames: {}, zoom: .65, x: 80, y: 120 }, mode: 'interact', busy: false, comments: false, inspector: false, blocked: {}, statusOpen: false, connectOpen: false, code: {} };
+let state: State = { layout: { frames: {}, zoom: .65, x: 80, y: 120 }, mode: 'interact', busy: false, comments: false, inspector: false, blocked: {}, statusOpen: false, connectOpen: false, settingsOpen: false, code: {} };
 export const iframes = new Map<string, HTMLIFrameElement>();
 export function subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 export function snapshot() { return state; }
@@ -84,13 +84,14 @@ export function fit() {
  const zoom = Math.max(.15, Math.min(1, (innerWidth - pad * 2) / width, (innerHeight - chromeTop - chromeBottom) / height));
  setLayout({...state.layout, zoom, x:(innerWidth-width*zoom)/2-left*zoom, y:chromeTop + Math.max(0, (innerHeight - chromeTop - chromeBottom - height * zoom) / 2) - top * zoom}, false);
 }
-export function setMode(mode: Mode) { update({mode}); iframes.forEach(iframe => iframe.contentWindow?.postMessage({type:'draftroom:mode', mode}, '*')); }
+function bridgeMode(mode: Mode) { return mode === 'pan' ? 'interact' : mode; }
+export function setMode(mode: Mode) { update({mode}); iframes.forEach(iframe => iframe.contentWindow?.postMessage({type:'draftroom:mode', mode: bridgeMode(mode)}, '*')); }
 export function syncBridge(frameId: string) {
  const frame=iframes.get(frameId)?.contentWindow;
- frame?.postMessage({type:'draftroom:mode',mode:state.mode}, '*');
+ frame?.postMessage({type:'draftroom:mode',mode:bridgeMode(state.mode)}, '*');
 }
 let trail: string[] = [];
-export function present(frameId: string, fromFlow = false) { if(!fromFlow) trail = []; update({presenting:frameId, selected:frameId, info:undefined}); location.hash = `frame/${encodeURIComponent(frameId)}`; }
+export function present(frameId: string, fromFlow = false) { if(!fromFlow) trail = []; update({presenting:frameId, selected:frameId}); location.hash = `frame/${encodeURIComponent(frameId)}`; }
 export function nextSteps(frameId: string) { return (state.workspace?.experiment.edges ?? []).filter(edge => edge.from === frameId && state.workspace?.experiment.frames.some(frame => frame.id === edge.to)); }
 export function followFlow(frameId: string) { if(state.presenting && state.presenting !== frameId) trail.push(state.presenting); present(frameId, true); }
 function flowBack() { const previous = trail.pop(); if(previous) present(previous, true); }
@@ -118,8 +119,12 @@ export function selectInspectTarget(frameId: string, target: Target) {
  shareSelection(frameId, target);
 }
 export function selectCommentTarget(frameId: string, target: Target) {
- update({ target: { frameId, target }, selected: frameId, comments: true, inspector: false, feedback: undefined });
+ update({ target: { frameId, target }, selected: frameId, inspector: false, feedback: undefined });
  shareSelection(frameId, target);
+}
+export function openComment(frameId: string, commentId: string) {
+ update({ feedback: commentId, selected: frameId, target: undefined, inspector: false });
+ requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-comment-id="${CSS.escape(commentId)}"]`)?.focus());
 }
 function shareSelection(frameId: string, target: Target) {
  if(state.workspace?.readOnly) return;
@@ -150,7 +155,7 @@ function onMessage(event:MessageEvent<unknown>) {
  }
 }
 function onKey(event:KeyboardEvent) {
- if(event.key==='Escape') { setMode('interact'); update({target:undefined,info:undefined,comments:false,inspector:false,compare:undefined,statusOpen:false,connectOpen:false,historyFrame:undefined}); leavePresentation(); }
+ if(event.key==='Escape') { setMode('interact'); update({target:undefined,feedback:undefined,comments:false,inspector:false,statusOpen:false,connectOpen:false,settingsOpen:false,historyFrame:undefined}); leavePresentation(); }
  if(event.target instanceof HTMLElement && event.target.closest('input,textarea,select,[contenteditable],form')) return;
  if(presentationKey(event.key)) { event.preventDefault(); return; }
  if(event.key==='0') fit();
@@ -177,19 +182,14 @@ export function applyPresence(actors: PresenceActor[]) {
   update({ workspace: { ...workspace, presence } });
 }
 
-export interface CompareGroup { name: string; control: Frame; variants: Frame[] }
-export function compareGroups(frames: Frame[]): CompareGroup[] {
- const names = [...new Set(frames.filter(frame => frame.role).map(frame => frame.group ?? 'default'))];
- return names.flatMap(name => {
-  const members = frames.filter(frame => (frame.group ?? 'default') === name);
-  const control = members.find(frame => frame.role === 'control');
-  const variants = members.filter(frame => frame.role === 'variant');
-  return control && variants.length ? [{ name, control, variants }] : [];
- });
-}
 export function activeFeedback(): Feedback[] { return state.workspace?.feedback ?? []; }
 export async function initialize() {
  window.addEventListener('message',onMessage); window.addEventListener('hashchange',readRoute); window.addEventListener('keydown',onKey);
+ window.addEventListener('wheel', event => {
+  if (!event.ctrlKey && !event.metaKey) return;
+  event.preventDefault();
+  zoomBy(event.deltaY > 0 ? .94 : 1.06);
+ }, { passive: false });
  if(window.__DRAFTROOM__) { acceptWorkspace(window.__DRAFTROOM__,true); return; }
  await refresh();
  const events = new EventSource('./api/events');

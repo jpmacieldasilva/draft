@@ -136,7 +136,8 @@ test('export leva arestas e comentários somente leitura', async ({ page, worksp
   try {
    await page.goto(`${server.url}/full/index.html`);
    await expect(page.locator('.flow-label')).toHaveText(['Ver lista', 'Ler agora', 'Voltar ao início']);
-   await page.getByRole('button', { name: /^Comentários/ }).click();
+   await page.getByRole('button', { name: 'Configurações', exact: true }).click();
+   await page.getByRole('menuitem', { name: /^Comentários/ }).click();
    await expect(page.getByText('Revisar a ordem.', { exact: true })).toBeVisible();
    await expect(page.getByRole('button', { name: 'Resolver', exact: true })).toHaveCount(0);
    await page.goto(`${server.url}/full/index.html#frame/base`);

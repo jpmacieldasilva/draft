@@ -32,9 +32,8 @@ test('preserva interação entre canvas, apresentação e retorno',async({page})
  await page.getByRole('button',{name:/Canvas/}).click();
  await expect.poll(()=>page.evaluate(()=>Boolean(document.fullscreenElement))).toBe(false);
  await expect(row).toHaveClass(/done/);
- await page.getByRole('button',{name:'Lista que entende o que você escreve',exact:false}).click();
- await expect(page.getByRole('dialog')).toContainText('Um app de lista minimalista');
- await page.getByRole('button',{name:'Fechar informações'}).click();
+ await expect(page.locator('.workspace-title')).toHaveText('Lista que entende o que você escreve');
+ await expect(page.getByRole('button',{name:/Informações/})).toHaveCount(0);
 });
 
 test('abre inspector ao selecionar elemento sem misturar comentários',async({page})=>{
@@ -66,8 +65,13 @@ test('persiste comentário de região, resolve e reabre na pasta',async({page})=
  await page.getByRole('button',{name:'Salvar comentário'}).click();
  await expect(page.getByRole('button',{name:'Resolver',exact:true})).toBeVisible();
  await page.reload();
- await page.getByRole('button',{name:/^Comentários/}).click();
- await expect(page.getByText('Dar mais espaço ao título.',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Configurações',exact:true}).click();
+ await page.getByRole('menuitem',{name:/^Comentários/}).click();
+ await expect(page.locator('.comments-panel textarea')).toHaveCount(0);
+ await page.locator('.comment-list .comment',{hasText:'Dar mais espaço ao título.'}).click();
+ const popover=page.getByRole('dialog',{name:'Comentário'});
+ await expect(popover).toContainText('Você');
+ await expect(popover).toContainText('Dar mais espaço ao título.');
  await page.getByRole('button',{name:'Resolver',exact:true}).click();
  await expect(page.getByRole('button',{name:'Reabrir',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Reabrir',exact:true}).click();

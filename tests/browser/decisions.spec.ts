@@ -215,12 +215,14 @@ test('rejeitar suposição gera comentário e aceitar não', async ({ page, stud
   await page.keyboard.press('Tab');
   await expect(ready).toBeFocused();
   await expect(ready).toHaveAccessibleName('Pronto');
-  await page.getByRole('button', { name: 'Status', exact: true }).click();
+  await ready.click();
   const panel = page.getByRole('complementary', { name: 'Status dos frames' });
   await expect(panel.getByText('Ajustei a leitura.')).toBeVisible();
   await shot(page, 'assumptions');
   await panel.locator('li').filter({ hasText: 'Usar a margem curta.' }).getByRole('button', { name: 'Aceitar', exact: true }).click();
-  await expect(page.getByRole('button', { name: /^Comentários/ })).toContainText('0');
+  await page.getByRole('button', { name: 'Configurações', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: /^Comentários/ })).toContainText('0');
+  await page.getByRole('button', { name: 'Configurações', exact: true }).click();
   await panel.locator('li').filter({ hasText: 'Esconder o subtítulo.' }).getByRole('button', { name: 'Rejeitar', exact: true }).click();
   await expect(page.getByText('Suposição rejeitada: Esconder o subtítulo.')).toBeVisible();
   const open = (await runCli(['feedback', 'list', studio.folder, '--open'])).json<Array<{ message: string }>>();
@@ -267,15 +269,16 @@ test('código é somente leitura e a nota de pesquisa entra no contexto', async 
  await frame.getByRole('button', { name: 'Prévia', exact: true }).click();
  await expect(frame.locator('iframe')).toBeVisible();
  await writeFile(path.join(studio.folder, 'research.md'), '# Notas de pesquisa\n\nHipótese de campo.\n');
- await expect(page.getByRole('complementary', { name: 'Notas de pesquisa' })).toContainText('Hipótese de campo', { timeout: 2000 });
- await shot(page, 'research-note');
+ await expect(page.getByRole('complementary', { name: 'Notas de pesquisa' })).toHaveCount(0);
  expect((await runCli(['context', studio.folder])).json<{ research: string }>().research).toContain('Hipótese de campo');
 });
 
 test('conectar agente mostra o comando de cada cliente', async ({ page, studio }) => {
  await page.goto(studio.url);
  const folder = ((await (await fetch(`${studio.url}/api/workspace`)).json()) as { folder: string }).folder;
- await page.getByRole('button', { name: 'Conectar agente', exact: true }).click();
+ const topConnect = page.locator('.topbar').getByRole('button', { name: 'Conectar agente', exact: true });
+ await expect(topConnect).toBeVisible();
+ await topConnect.click();
  const dialog = page.getByRole('dialog', { name: 'Conectar agente' });
  for (const tab of ['Claude Code', 'Cursor', 'Codex', 'Manual']) {
   await dialog.getByRole('tab', { name: tab, exact: true }).click();
@@ -284,13 +287,18 @@ test('conectar agente mostra o comando de cada cliente', async ({ page, studio }
   await expect(dialog.getByRole('tabpanel')).toContainText('mcp');
  }
  await shot(page, 'connect-agent');
+ await page.getByRole('button', { name: 'Fechar conexão', exact: true }).click();
+ expect((await runCli(['presence', 'claim', studio.folder, 'base', '--label', 'Agente', '--ttl', '120'])).code).toBe(0);
+ await expect(topConnect).toHaveCount(0, { timeout: 2000 });
+ await page.getByRole('button', { name: 'Configurações', exact: true }).click();
+ await page.getByRole('menuitem', { name: 'Conectar agente', exact: true }).click();
+ await expect(page.getByRole('dialog', { name: 'Conectar agente' })).toBeVisible();
 });
 
-test('comparar mostra papel e decisão em cada frame', async ({ page, studio }) => {
+test('papel é um selo e não abre comparação', async ({ page, studio }) => {
  const manifestPath = path.join(studio.folder, 'experiment.json');
  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
  manifest.schemaVersion = 2;
- manifest.decision = { hypothesis: 'A barra lateral reduz o tempo para filtrar.', criteria: 'Menos cliques até achar uma compra.' };
  manifest.frames = manifest.frames.map((frame: { id: string; role?: string }) => {
   const next = { ...frame, group: 'lista' };
   if (frame.id === 'base') next.role = 'control';
@@ -300,21 +308,14 @@ test('comparar mostra papel e decisão em cada frame', async ({ page, studio }) 
  });
  await writeFile(manifestPath, JSON.stringify(manifest));
  await page.goto(studio.url);
- const variantFrame = lateral(page);
- await variantFrame.getByRole('button', { name: 'Compacta com barra lateral', exact: true }).click();
- await variantFrame.getByRole('button', { name: 'Comparar controle e variante', exact: true }).click();
- const dialog = page.getByRole('dialog', { name: 'Comparar controle e variante' });
- await expect(dialog.locator('iframe[title="Controle: Base clara"]')).toBeVisible();
- await expect(dialog.locator('iframe[title="Variante: Compacta com barra lateral"]')).toBeVisible();
- const control = dialog.locator('figure').filter({ has: page.locator('iframe[title="Controle: Base clara"]') });
- const variant = dialog.locator('figure').filter({ has: page.locator('iframe[title="Variante: Compacta com barra lateral"]') });
- await expect(control).toContainText('Controle');
- await expect(variant).toContainText('Variante');
- await expect(control).not.toContainText('Menos cliques até achar uma compra.');
- await expect(variant).not.toContainText('Menos cliques até achar uma compra.');
- const criteria = dialog.locator('.compare-criteria');
- await expect(criteria).toHaveCount(1);
- await expect(criteria).toContainText('A barra lateral reduz o tempo para filtrar.');
- await expect(criteria).toContainText('Menos cliques até achar uma compra.');
- await shot(page, 'compare-decision');
+ const control = page.locator('article[aria-label="Base clara"] [data-testid="frame-role"]');
+ const variant = page.locator('article[aria-label="Compacta com barra lateral"] [data-testid="frame-role"]');
+ await expect(control).toHaveText('Controle');
+ await expect(variant).toHaveText('Variante');
+ await expect(control).toHaveCSS('background-color', 'rgb(240, 239, 236)');
+ await expect(control).toHaveCSS('border-top-width', '0px');
+ expect(await control.evaluate(element => element.tagName)).toBe('SPAN');
+ expect(await variant.evaluate(element => element.tagName)).toBe('SPAN');
+ await expect(page.getByRole('button', { name: 'Comparar controle e variante', exact: true })).toHaveCount(0);
+ await expect(page.getByRole('dialog', { name: 'Comparar controle e variante' })).toHaveCount(0);
 });

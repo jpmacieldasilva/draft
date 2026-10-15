@@ -87,7 +87,8 @@ test('estado legado em .draftroom migra para .draft sem perder comentários', as
  try {
   expect((await api(viewer.url, 'feedback', { frameId: 'launcher', message: 'Comentário novo', target: { kind: 'region', label: 'Área', rect: { x: 1, y: 1, width: 20, height: 20 } } })).status).toBe(200);
   await page.goto(viewer.url);
-  await page.getByRole('button', { name: /^Comentários/ }).click();
+  await page.getByRole('button', { name: 'Configurações', exact: true }).click();
+  await page.getByRole('menuitem', { name: /^Comentários/ }).click();
   await expect(page.getByText('Comentário antigo', { exact: true })).toBeVisible();
   await expect(page.getByText('Comentário novo', { exact: true })).toBeVisible();
   const log = await read(workspace, '.draft/feedback.jsonl');

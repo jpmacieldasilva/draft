@@ -80,8 +80,10 @@ label { display: grid; gap: var(--space-8); font-size: var(--text-12); }
   align-items: center;
   justify-content: space-between;
   background: var(--color-app);
+  transform: none;
 }
-.identity, .topbar-end { display: flex; align-items: center; gap: var(--space-24); }
+.identity, .topbar-end { display: flex; align-items: center; gap: var(--space-12); }
+.logo { width: 20px; height: 20px; display: block; flex: none; color: var(--color-text); }
 .brand {
   font-size: var(--text-20);
   letter-spacing: -.8px;
@@ -172,9 +174,7 @@ button.frame-status-needs-you:focus-visible { outline-offset: 6px; }
   padding: var(--space-4) var(--space-8);
   white-space: nowrap;
 }
-button.frame-role { cursor: pointer; }
-button.frame-role:hover,
-button.frame-role:focus-visible { background: var(--color-canvas-dot); color: var(--color-text); }
+.frame-role { cursor: default; }
 .dimensions { font-size: var(--text-12); color: var(--color-text-secondary); margin-left: auto; white-space: nowrap; }
 .icon-button, .frame-menu > summary {
   width: 30px;
@@ -268,13 +268,14 @@ button.frame-role:focus-visible { background: var(--color-canvas-dot); color: va
   border-radius: var(--radius-panel);
 }
 .toolbar button {
-  min-width: 31px;
-  height: 35px;
-  padding: 0 var(--space-12);
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-8);
+  gap: 0;
   border-radius: var(--radius-button);
   white-space: nowrap;
 }
@@ -282,7 +283,9 @@ button.frame-role:focus-visible { background: var(--color-canvas-dot); color: va
 .toolbar button.active, .toolbar button.active:hover { background: var(--color-app); color: var(--color-text); }
 .toolbar button > span { font-size: var(--text-12); }
 .toolbar .divider { margin: 0 var(--space-4); height: 20px; }
-.toolbar .zoom { font-size: var(--text-12); min-width: 44px; padding: 0; }
+.toolbar .zoom { width: auto; font-size: var(--text-12); min-width: 48px; padding: 0 var(--space-8); font-variant-numeric: tabular-nums; }
+.pan-layer { position: absolute; inset: 0; z-index: 8; cursor: grab; touch-action: none; }
+.pan-layer:active { cursor: grabbing; }
 .hidden-frames { position: fixed; right: 240px; bottom: 36px; z-index: 22; font-size: var(--text-12); color: var(--color-text-secondary); }
 .hidden-frames .menu { top: auto; bottom: 30px; }
 .region-overlay { position: absolute; inset: 0; z-index: 4; cursor: crosshair; background: color-mix(in srgb, var(--color-text) 4%, transparent); }
@@ -338,8 +341,39 @@ button.frame-role:focus-visible { background: var(--color-canvas-dot); color: va
 .primary { background: var(--color-text); color: var(--color-surface); padding: var(--space-12); border-radius: var(--radius-button); }
 .primary:hover { background: var(--color-text-secondary); color: var(--color-surface); }
 .empty-copy { padding: var(--space-24); line-height: 1.7; color: var(--color-text-secondary); }
-.comment { padding: var(--space-24); border-bottom: 1px solid var(--color-border); display: grid; gap: var(--space-8); }
+.comment-list .comment {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-24);
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  text-align: left;
+  background: transparent;
+}
+.comment-excerpt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.comment-list .comment > span:last-child { flex: none; font-size: var(--text-12); color: var(--color-text-secondary); }
 .comment p { line-height: 1.65; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comment-popover {
+  position: fixed;
+  z-index: 45;
+  display: grid;
+  gap: var(--space-12);
+  padding: var(--space-16);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-float);
+}
+.comment-popover p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.comment-popover .comment-author { font-size: var(--text-12); font-weight: var(--weight-medium); }
+.comment-popover textarea { min-height: 72px; }
+.comment-popover .comment-compose { padding: 0; border: 0; }
+.comment-popover .popover-actions { display: flex; justify-content: flex-end; gap: var(--space-8); }
+.comment-popover .popover-actions button { padding: var(--space-8) var(--space-12); border: 1px solid var(--color-border); border-radius: var(--radius-button); }
 .comment footer {
   display: flex;
   justify-content: space-between;
@@ -505,7 +539,7 @@ button.frame-role:focus-visible { background: var(--color-canvas-dot); color: va
 .viewport-presets button { padding: var(--space-8); font-size: var(--text-12); }
 .viewport-panel button { font-size: var(--text-12); }
 button svg, summary svg { width: 18px; height: 18px; stroke-width: 1.7; flex: none; }
-.toolbar button svg { width: 18px; height: 18px; }
+.toolbar button svg, .settings > button svg, .logo { width: 20px; height: 20px; }
 .workspace-title svg { width: 14px; height: 14px; }
 .frame:has(details[open]) { z-index: 15; }
 
@@ -562,6 +596,22 @@ button svg, summary svg { width: 18px; height: 18px; stroke-width: 1.7; flex: no
   padding: var(--space-8) var(--space-16);
 }
 .topbar .add-frame:hover { background: var(--color-text-secondary); color: var(--color-surface); }
+.topbar .connect-secondary {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  border-radius: var(--radius-button);
+  padding: var(--space-8) var(--space-16);
+  font-size: var(--text-13);
+  font-weight: var(--weight-medium);
+}
+.topbar .connect-secondary:hover { background: var(--color-canvas); }
+.settings { position: relative; }
+.settings > button { width: 36px; height: 36px; display: grid; place-items: center; border-radius: var(--radius-button); color: var(--color-text); }
+.settings > button:hover, .settings > button[aria-expanded="true"] { background: var(--color-canvas); }
+.settings .menu { top: 44px; width: 240px; }
+.settings .menu button { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); }
+.settings .menu button span { font-size: var(--text-12); color: var(--color-text-secondary); }
 .create-sheet { max-width: 520px; padding: var(--space-48); }
 .create-sheet h1 { margin-bottom: var(--space-16); }
 .create-copy { color: var(--color-text-secondary); line-height: 1.7; margin: 0 0 var(--space-24); }
@@ -722,20 +772,6 @@ details[open] > .menu, details[open] > .viewport-panel { animation: menu-enter v
 .history-list button { display: grid; gap: var(--space-4); text-align: left; }
 .history-list button span { font-size: var(--text-12); color: var(--color-text-secondary); }
 .history-diff label { display: grid; gap: var(--space-4); margin-bottom: var(--space-8); font-size: var(--text-12); color: var(--color-text-secondary); }
-.research-note {
-  position: fixed;
-  z-index: 25;
-  width: min(300px, calc(100vw - 48px));
-  max-height: 220px;
-  overflow: auto;
-  padding: var(--space-16);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-panel);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-float);
-}
-.research-note h2 { margin: 0 0 var(--space-8); font-size: var(--text-13); }
-.research-note .markdown-doc { margin-bottom: 0; }
 .compare-frame-decision { margin: var(--space-8) 0 0; }
 .frame-warning {
   position: absolute;
