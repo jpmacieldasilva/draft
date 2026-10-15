@@ -1,5 +1,5 @@
 # Biblioteca editorial
 
-Um texto em destaque orienta a primeira leitura. O restante da biblioteca fica abaixo, sem competir por atenção.
+A porta de entrada: um herói com a pergunta da semana e o texto em destaque.
 
-Observe se a hierarquia ajuda a escolher. Teste a busca e o botão Guardar.
+Observe se o título convida a ler antes de pedir uma ação. Teste a busca e o botão Guardar.

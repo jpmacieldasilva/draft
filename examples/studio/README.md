@@ -4,11 +4,11 @@ Three paths back to the texts that deserve attention.
 
 ## What we are exploring
 
-Can a library invite reading without turning every text into another task? Compare editorial discovery, a compact list, and a focused reading view.
+Can a library invite reading without turning every text into another task? The same product appears as a landing hero, a dashboard of cards, and a pricing section.
 
 ## Try it
 
-Open a prototype, filter the library, and save a text. In the focus alternative, adjust font size. Controls are real and run locally.
+Open a prototype. On the landing, save the featured text. On the dashboard, filter the library. On the plans, mark the sample chapter as read. Controls are real and run locally.
 
 ## Leave an intention
 

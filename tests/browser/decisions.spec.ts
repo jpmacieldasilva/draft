@@ -46,6 +46,14 @@ async function connect(folder: string) {
 
 const editorial = (page: import('@playwright/test').Page) => page.locator('article[aria-label="Biblioteca editorial"]');
 
+test('o canvas mostra os três frames do estudo', async ({ page, studio }) => {
+ await page.goto(studio.url);
+ for (const title of ['Biblioteca editorial', 'Leitura em movimento', 'Um texto por vez']) {
+  await expect(page.frameLocator(`iframe[title="${title}"]`).getByRole('heading', { level: 1 })).toBeVisible();
+ }
+ await shot(page, 'canvas-overview');
+});
+
 test('claim muda o selo do frame em até 2 segundos', async ({ page, studio }) => {
  await page.goto(studio.url);
  const frame = editorial(page);

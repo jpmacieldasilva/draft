@@ -1,5 +1,5 @@
 # Um texto por vez
 
-O texto ocupa a tela. Ajustar a letra e marcar a leitura são as únicas ações persistentes.
+A seção de planos, com um trecho real do texto da semana logo abaixo.
 
-Observe o ritmo da tipografia, a margem e a visibilidade do progresso.
+Observe se o preço e o trecho conversam. Ajustar a letra e marcar a leitura continuam no próprio texto.

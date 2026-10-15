@@ -1,5 +1,5 @@
 # Leitura em movimento
 
-Uma lista curta permite comparar títulos rapidamente. Os filtros separam textos guardados e toda a biblioteca.
+O painel da biblioteca: três números no topo e os textos em cartões.
 
-Observe se o ganho de densidade preserva espaço para respirar.
+Observe se a densidade ainda deixa espaço para escolher. Os filtros separam o que foi guardado.
