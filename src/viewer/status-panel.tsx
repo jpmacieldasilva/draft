@@ -42,9 +42,14 @@ export function StatusPanel() {
   const workspace = snapshot().workspace;
   if (!snapshot().statusOpen || !workspace) return null;
   const grouped = GROUPS.map(group => ({ ...group, frames: workspace.experiment.frames.filter(frame => frameActivity(frame.id, workspace) === group.activity) }));
+  const filters = workspace.experiment.frames.filter(frame => frame.state);
   return <aside className="side-panel status-panel" aria-label={t('status.title')}>
     <header><h2>{t('status.title')}</h2><button aria-label={t('status.close')} onClick={() => update({ statusOpen: false })}><X /></button></header>
-    {!grouped.some(group => group.frames.length) && <p className="empty-copy">{t('status.empty')}</p>}
+    {!!filters.length && <section className="status-group" aria-label={t('meta.state')}>
+      <h3>{t('meta.state')}</h3>
+      {filters.map(frame => <div key={frame.id} className="status-filter"><strong>{frame.title}</strong><span>{frame.state}</span></div>)}
+    </section>}
+    {!grouped.some(group => group.frames.length) && !filters.length && <p className="empty-copy">{t('status.empty')}</p>}
     {grouped.filter(group => group.frames.length).map(group => <section key={group.activity} className="status-group" aria-label={t(group.key)}>
       <h3>{t(group.key)}</h3>
       {group.frames.map(frame => <FrameDecisions key={frame.id} frame={frame} workspace={workspace} />)}

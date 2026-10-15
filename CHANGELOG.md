@@ -8,6 +8,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
+- Canvas frames use the frame shadow and a 12px radius, with 96px between frames. The frame name stays visible; size and frame actions appear when the frame is selected or focused. Flow filters live in the side panel. Compare opens from the role chip. The top bar keeps the project name and **Adicionar protótipo**.
 - **Breaking:** flow connections are stored in `experiment.json` (`edges`) instead of `.draft/layout.json`, so they are shared through Git. Existing connections are migrated on open. `POST /api/edges` replaces the layout field.
 
 ### Fixed

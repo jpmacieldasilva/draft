@@ -18,8 +18,10 @@ Weights are 400 (`--weight-regular`) and 500 (`--weight-medium`). Sizes are 12, 
 | `--color-canvas` | `#F6F5F3` | Canvas field, quiet fills |
 | `--color-canvas-dot` | `#E7E6E3` | Canvas dots |
 | `--color-accent` | `#5874A7` | Selection, focus, and the agent presence ring |
+| `--color-chip` | `#F0EFEC` | Role chip fill |
+| `--state-alert` | `#C2553D` | The needs-you status dot only |
 
-Accent is not a general action color. Mixes of these colors with transparency are allowed for rings, scrims, and floating surfaces. New hues are not.
+Accent is not a general action color. `--state-alert` is not a chip or button fill. Mixes of these colors with transparency are allowed for rings, scrims, and floating surfaces. New hues are not.
 
 ## Radius
 

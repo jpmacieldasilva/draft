@@ -84,10 +84,12 @@ test('renomear e duplicar preservam decisão, arestas e papéis', async ({ page,
  const viewer = await startViewer(workspace);
  try {
   await page.goto(viewer.url);
+  await page.getByRole('button', { name: 'Launcher escuro', exact: true }).click();
   await page.getByLabel('Opções de Launcher escuro').click();
   await page.getByRole('textbox', { name: 'Novo título' }).fill('Leitura rápida');
   await page.getByRole('button', { name: 'Renomear', exact: true }).click();
   await expect(page.locator('iframe[title="Leitura rápida"]')).toBeVisible();
+  await page.getByRole('button', { name: 'Base clara', exact: true }).click();
   await page.getByLabel('Opções de Base clara').click();
   await page.getByRole('button', { name: 'Duplicar alternativa', exact: true }).first().click();
   await expect(page.locator('iframe')).toHaveCount(5);
@@ -140,8 +142,13 @@ test('selos de estado e papel aparecem no cabeçalho do frame', async ({ page, w
  const viewer = await startViewer(workspace);
  try {
   await page.goto(viewer.url);
-  await expect(page.locator('article[aria-label="Base clara"] .frame-badge')).toHaveText(['ready', 'Controle']);
-  await expect(page.locator('article[aria-label="Compacta com barra lateral"] .frame-badge')).toHaveText(['loading', 'Variante']);
+  await expect(page.locator('article[aria-label="Base clara"] [data-testid="frame-role"]')).toHaveText('Controle ⇄');
+  await expect(page.locator('article[aria-label="Compacta com barra lateral"] [data-testid="frame-role"]')).toHaveText('Variante ⇄');
+  await expect(page.locator('article [data-testid="frame-state"]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Status', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'Status dos frames' });
+  await expect(panel.getByText('ready', { exact: true }).first()).toBeVisible();
+  await expect(panel.getByText('loading', { exact: true })).toBeVisible();
  } finally { viewer.process.kill('SIGTERM'); }
 });
 
@@ -156,6 +163,7 @@ test('decisão, teste e sinal aparecem no painel de informações', async ({ pag
   await expect(sheet.locator('.decision')).toContainText('A barra lateral reduz o tempo para filtrar.');
   await expect(sheet.locator('.decision')).toContainText('Menos cliques até achar uma compra.');
   await page.getByRole('button', { name: 'Fechar informações' }).click();
+  await page.locator('article[aria-label="Compacta com barra lateral"]').getByRole('button', { name: 'Compacta com barra lateral', exact: true }).click();
   await page.getByRole('button', { name: 'Informações de Compacta com barra lateral', exact: true }).click();
   await expect(sheet.locator('.frame-meta')).toContainText('Barra lateral com contadores.');
   await expect(sheet.locator('.frame-meta')).toContainText('clicks_to_filter');
@@ -167,10 +175,12 @@ test('comparar mostra controle e variante lado a lado com o critério', async ({
  const viewer = await startViewer(workspace);
  try {
   await page.goto(viewer.url);
-  await expect(page.getByRole('button', { name: 'Comparar', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Comparar controle e variante', exact: true })).toHaveCount(0);
   await abTest(workspace);
-  await expect(page.getByRole('button', { name: 'Comparar', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Comparar', exact: true }).click();
+  const variant = page.locator('article[aria-label="Launcher escuro"]');
+  await variant.getByRole('button', { name: 'Launcher escuro', exact: true }).click();
+  await expect(variant.getByRole('button', { name: 'Comparar controle e variante', exact: true })).toBeVisible();
+  await variant.getByRole('button', { name: 'Comparar controle e variante', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Comparar controle e variante' });
   await expect(dialog).toContainText('Menos cliques até achar uma compra.');
   await expect(dialog.locator('iframe[title="Controle: Base clara"]')).toBeVisible();

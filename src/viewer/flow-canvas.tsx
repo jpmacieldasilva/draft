@@ -104,7 +104,7 @@ function centerMap(event: MouseEvent<SVGSVGElement>, left: number, top: number, 
 }
 export function MiniMap() {
  const state = useSyncExternalStore(subscribe, snapshot);
- if (state.presenting || !state.workspace?.experiment.frames.length) return null;
+ if (state.presenting || state.layout.zoom >= 1 || !state.workspace?.experiment.frames.length) return null;
  const positions = state.workspace.experiment.frames.map(framePosition).filter(position => !position.hidden);
  const viewport = { x: -state.layout.x / state.layout.zoom, y: -state.layout.y / state.layout.zoom, width: innerWidth / state.layout.zoom, height: innerHeight / state.layout.zoom };
  const left = Math.min(viewport.x, ...positions.map(position => position.x)) - 100, top = Math.min(viewport.y, ...positions.map(position => position.y)) - 100;

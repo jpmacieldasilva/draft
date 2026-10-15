@@ -1,6 +1,6 @@
-import { useEffect, useState, useSyncExternalStore, type PointerEvent, type FormEvent } from 'react';
+import { useEffect, useState, useSyncExternalStore, type CSSProperties, type PointerEvent, type FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MousePointer2, Scan, Info as InfoIcon, Play, MoreHorizontal, ChevronDown, X, Plus, Minus, Maximize, ArrowLeft, MessageSquare, MoveDiagonal, SquareDashed } from 'lucide-react';
+import { MousePointer2, Scan, Info as InfoIcon, Play, MoreHorizontal, X, Plus, Minus, Maximize, ArrowLeft, MessageSquare, MoveDiagonal, SquareDashed } from 'lucide-react';
 import { Markdown } from './markdown';
 import { FlowConnections, MiniMap, ConnectionControls, FrameConnector } from './flow-canvas';
 import { VisualEditor } from './visual-editor';
@@ -9,7 +9,7 @@ import '@astryxdesign/core/reset.css';
 import '@astryxdesign/core/astryx.css';
 import '@astryxdesign/theme-neutral/theme.css';
 import './style.css';
-import { frameActivity, type Frame, type Position } from '../protocol';
+import { frameActivity, type Frame, type Layout, type Position } from '../protocol';
 import { t } from '../i18n';
 import { subscribe, snapshot, update, initialize, framePosition, iframes, setPosition, saveLayout, setLayout, fit, zoomBy, setMode, present, leavePresentation, syncBridge, mutate, refresh, discardLayoutConflict, activeClaim, compareGroups, nextSteps, followFlow, showCode } from './store';
 import { StatusPanel } from './status-panel';
@@ -66,32 +66,42 @@ function FrameSource({frame}:{frame:Frame}) {
  if(failed) return <p className="frame-error">{t('frame.codeError')}</p>;
  return <pre className="frame-source" tabIndex={0}>{content}</pre>;
 }
+function RoleChip({ frame, frames }: { frame: Frame; frames: Frame[] }) {
+ if (!frame.role) return null;
+ const group = frame.group ?? 'default';
+ const paired = compareGroups(frames).some(item => item.name === group);
+ const label = t(`role.${frame.role}`);
+ if (!paired) return <span className={`frame-role frame-role-${frame.role}`} data-testid="frame-role" title={frame.group ? t('frame.groupTitle', { group: frame.group }) : undefined}>{label}</span>;
+ return <button type="button" className={`frame-role frame-role-${frame.role}`} data-testid="frame-role" aria-label={t('compare.label')} title={frame.group ? t('frame.groupTitle', { group: frame.group }) : undefined} onClick={() => update({ selected: frame.id, compare: { group, variant: frame.role === 'variant' ? frame.id : undefined } })}>{label} ⇄</button>;
+}
 function FrameView({frame}:{frame:Frame}) {
  const state=useStore(), position=framePosition(frame), presenting=state.presenting===frame.id;
  const comments=state.workspace?.feedback.filter(comment=>comment.frameId===frame.id) ?? [];
  const claim = activeClaim(frame.id);
  const activity = state.workspace ? frameActivity(frame.id, state.workspace) : null;
  const showingCode = !!state.code[frame.id];
+ const frames = state.workspace?.experiment.frames ?? [];
  return <article className={`frame ${presenting?'presenting':''} ${state.selected===frame.id?'selected':''}${claim?' agent-active':''}`} style={{left:position.x,top:position.y,width:position.width,height:position.height+44,display:position.hidden&&!presenting?'none':undefined}} aria-label={frame.title} data-frame-id={frame.id} title={claim ? t('frame.agentHere') : undefined}>
   <header className="frame-header" data-testid="frame-header" onPointerDown={event=>startMove(event,frame)}>
    <button className="frame-title" data-testid="frame-action-title" onClick={()=>update({selected:frame.id})}>{frame.title}</button>
-   {frame.state&&<span className="frame-badge frame-state" data-testid="frame-state" title={t('frame.stateTitle')}>{frame.state}</span>}
-   {frame.role&&<span className={`frame-badge frame-role-${frame.role}`} data-testid="frame-role" title={frame.group?t('frame.groupTitle',{group:frame.group}):undefined}>{t(`role.${frame.role}`)}</span>}
-   {activity&&<span className={`frame-badge frame-activity frame-activity-${activity}`} data-testid="frame-activity" data-activity={activity}>{t(activity==='needs-you'?'status.needsYou':activity==='working'?'status.working':'status.ready')}</span>}
    {claim&&<span className="agent-pill" data-testid="frame-agent" title={t('frame.agentHere')}>{t('frame.agent')}</span>}
-   <ViewportControls frame={frame}/>
-   <button className="icon-button" data-testid="frame-action-info" aria-label={t('frame.info',{title:frame.title})} title={t('frame.infoTitle')} onClick={()=>update({info:frame.id})}><InfoIcon/></button>
-   <button className="icon-button" data-testid="frame-action-present" aria-label={t('frame.present',{title:frame.title})} title={t('frame.presentTitle')} onClick={()=>present(frame.id)}><Play/></button>
-   {!state.workspace?.readOnly&&<details className="frame-menu"><summary data-testid="frame-action-options" aria-label={t('frame.options',{title:frame.title})}><MoreHorizontal/></summary><div className="menu">
-    <form onSubmit={event=>renameFrame(event,frame.id)}><label>{t('frame.newTitle')}<input name="title" defaultValue={frame.title} required maxLength={120}/></label><button type="submit" data-testid="frame-action-rename">{t('frame.rename')}</button></form>
-    <button data-testid="frame-action-duplicate" onClick={()=>void mutate(`frames/${encodeURIComponent(frame.id)}/duplicate`,{})}>{t('frame.duplicate')}</button>
-    <button data-testid="frame-action-hide" onClick={()=>setPosition(frame.id,{...position,hidden:true})}>{t('frame.hide')}</button>
-    <button data-testid="frame-action-history" onClick={()=>update({historyFrame:frame.id})}>{t('frame.history')}</button>
-   </div></details>}
+   {activity&&<span className={`frame-status frame-status-${activity}`} data-testid="frame-activity" data-activity={activity}><i aria-hidden="true"/>{t(activity==='needs-you'?'status.needsYou':activity==='working'?'status.working':'status.ready')}</span>}
+   <RoleChip frame={frame} frames={frames}/>
+   <div className="frame-tools">
+    <ViewportControls frame={frame}/>
+    <div className="frame-view-toggle" role="group" aria-label={t('frame.view')}><button type="button" aria-pressed={!showingCode} onClick={()=>showCode(frame.id,false)}>{t('frame.preview')}</button><button type="button" aria-pressed={showingCode} onClick={()=>showCode(frame.id,true)}>{t('frame.code')}</button></div>
+    <button className="icon-button" data-testid="frame-action-info" aria-label={t('frame.info',{title:frame.title})} title={t('frame.infoTitle')} onClick={()=>update({info:frame.id})}><InfoIcon/></button>
+    <button className="icon-button" data-testid="frame-action-present" aria-label={t('frame.present',{title:frame.title})} title={t('frame.presentTitle')} onClick={()=>present(frame.id)}><Play/></button>
+    {!state.workspace?.readOnly&&<details className="frame-menu"><summary data-testid="frame-action-options" aria-label={t('frame.options',{title:frame.title})}><MoreHorizontal/></summary><div className="menu">
+     <form onSubmit={event=>renameFrame(event,frame.id)}><label>{t('frame.newTitle')}<input name="title" defaultValue={frame.title} required maxLength={120}/></label><button type="submit" data-testid="frame-action-rename">{t('frame.rename')}</button></form>
+     <button data-testid="frame-action-duplicate" onClick={()=>void mutate(`frames/${encodeURIComponent(frame.id)}/duplicate`,{})}>{t('frame.duplicate')}</button>
+     <button data-testid="frame-action-hide" onClick={()=>setPosition(frame.id,{...position,hidden:true})}>{t('frame.hide')}</button>
+     <button data-testid="frame-action-history" onClick={()=>update({historyFrame:frame.id})}>{t('frame.history')}</button>
+    </div></details>}
+   </div>
   </header>
   {!!state.blocked[frame.id]?.length&&<p className="frame-warning" role="status">{t('frame.blocked',{hosts:state.blocked[frame.id].join(', ')})}</p>}
   <div className="frame-content">
-   <div className="frame-view-toggle" role="group" aria-label={t('frame.view')}><button type="button" aria-pressed={!showingCode} onClick={()=>showCode(frame.id,false)}>{t('frame.preview')}</button><button type="button" aria-pressed={showingCode} onClick={()=>showCode(frame.id,true)}>{t('frame.code')}</button></div>
    {showingCode ? <FrameSource frame={frame}/> : frame.error ? <div className="frame-error"><h2>{t('frame.errorTitle')}</h2><p>{frame.error}</p><button onClick={()=>void refresh()}>{t('app.retry')}</button></div> : <iframe ref={element=>{if(element) iframes.set(frame.id,element);else iframes.delete(frame.id);}} src={frame.url ?? `./content/${frame.entry}`} title={frame.title} sandbox="allow-scripts" onLoad={()=>syncBridge(frame.id)}/>}
    {comments.filter(comment=>comment.status==='open').map((comment,index)=><button key={comment.id} className={`pin ${state.feedback===comment.id?'active':''}`} style={{left:comment.target.rect.x,top:comment.target.rect.y}} title={comment.message} aria-label={t('frame.comment',{n:index+1,message:comment.message})} onClick={()=>update({feedback:comment.id,comments:true,inspector:false,target:undefined,selected:frame.id})}>{index+1}</button>)}
    {state.target?.frameId===frame.id&&state.target.target.kind==='region'&&<div className="selection" style={{left:state.target.target.rect.x,top:state.target.target.rect.y,width:state.target.target.rect.width,height:state.target.target.rect.height}}/>}
@@ -156,23 +166,66 @@ function Comments() {
   <div className="comment-list">{comments.map(comment=><section key={comment.id} className={`comment ${comment.status==='resolved'?'resolved':''} ${state.feedback===comment.id?'focused':''}`}><span className="muted">{state.workspace?.experiment.frames.find(frame=>frame.id===comment.frameId)?.title}</span><strong>{comment.target.label}</strong><p>{comment.message}</p><footer><span>{comment.status==='resolved'?t('comments.resolved'):t('comments.open')}</span>{!state.workspace?.readOnly&&<button onClick={()=>void mutate(`feedback/${encodeURIComponent(comment.id)}`,{status:comment.status==='open'?'resolved':'open'})}>{comment.status==='open'?t('comments.resolve'):t('comments.reopen')}</button>}</footer></section>)}</div>
  </aside>;
 }
+function noteOverlaps(spot: CSSProperties, frame: { left: number; top: number; right: number; bottom: number }, width: number, height: number, viewport: { w: number; h: number }) {
+ const left = typeof spot.left === 'number' ? spot.left : viewport.w - (typeof spot.right === 'number' ? spot.right : 0) - width;
+ const top = typeof spot.top === 'number' ? spot.top : viewport.h - (typeof spot.bottom === 'number' ? spot.bottom : 0) - height;
+ return left < frame.right && left + width > frame.left && top < frame.bottom && top + height > frame.top;
+}
+function ResearchNote() {
+ const state = useStore();
+ const research = state.workspace?.research;
+ const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight });
+ useEffect(() => {
+  const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+  window.addEventListener('resize', onResize);
+  return () => window.removeEventListener('resize', onResize);
+ }, []);
+ if (!research || state.statusOpen || state.presenting) return null;
+ const frames = state.workspace?.experiment.frames ?? [];
+ const rects = frames.map(frame => framePosition(frame)).filter(position => !position.hidden).map(position => ({
+  left: state.layout.x + position.x * state.layout.zoom,
+  top: state.layout.y + position.y * state.layout.zoom,
+  right: state.layout.x + (position.x + position.width) * state.layout.zoom,
+  bottom: state.layout.y + (position.y + position.height + 44) * state.layout.zoom,
+ }));
+ const bases = frames.filter(frame => frame.id === 'base' || frame.role === 'control').map(frame => framePosition(frame)).filter(position => !position.hidden).map(position => ({
+  left: state.layout.x + position.x * state.layout.zoom,
+  top: state.layout.y + position.y * state.layout.zoom,
+  right: state.layout.x + (position.x + position.width) * state.layout.zoom,
+  bottom: state.layout.y + (position.y + position.height + 44) * state.layout.zoom,
+ }));
+ const width = Math.min(300, viewport.w - 48), height = 220;
+ const spots: CSSProperties[] = [
+  { top: 84, right: 24 },
+  { top: 84, left: 24 },
+  { bottom: 96, right: 220 },
+  { bottom: 96, left: 24 },
+ ];
+ const misses = (spot: CSSProperties, boxes: Array<{ left: number; top: number; right: number; bottom: number }>) => boxes.every(box => !noteOverlaps(spot, box, width, height, viewport));
+ const below = Math.max(0, ...rects.map(box => box.bottom));
+ const room = viewport.h - below - 24;
+ const placed: CSSProperties = room >= 140
+  ? { left: 24, top: below + 16, maxHeight: Math.min(220, room - 8) }
+  : spots.find(spot => misses(spot, rects)) ?? spots.find(spot => misses(spot, bases.length ? bases : rects.slice(0, 1))) ?? spots[0];
+ return <aside className="research-note" style={placed} aria-label={t('research.title')}><h2>{t('research.title')}</h2><Markdown source={research}/></aside>;
+}
 function App() {
  const state=useStore(),workspace=state.workspace;
  if(!workspace) return <main className="loading"><span className="brand">{PRODUCT_NAME}<span>✳</span></span><p>{state.error ?? t('app.loading')}</p>{state.error&&<Button label={t('app.retry')} onClick={()=>void refresh()}/>}</main>;
  const hidden=workspace.experiment.frames.filter(frame=>framePosition(frame).hidden);
  return <main className={state.presenting?'app is-presenting':'app'}>
-  <header className="topbar"><div className="identity"><span className="brand">{PRODUCT_NAME}<span>✳</span></span><span className="divider"/><button className="workspace-title" onClick={()=>update({info:'workspace'})}>{workspace.experiment.title}<ChevronDown/></button></div><div className="topbar-end">{!workspace.readOnly&&workspace.git===false&&<span className="git-pill" role="status" aria-label={t('git.missing')}>{t('git.short')}</span>}<span className="save-state" role="status">{workspace.readOnly?t('app.readOnly'):state.busy?t('app.saving'):''}</span>{!workspace.readOnly&&<button className="status-toggle" onClick={()=>update({statusOpen:!state.statusOpen})}>{t('status.open')}</button>}{!workspace.readOnly&&workspace.folder&&<button className="connect-toggle" onClick={()=>update({connectOpen:true})}>{t('connect.open')}</button>}{!workspace.readOnly&&<button className="add-frame" onClick={()=>update({newFrame:true})}><Plus/>{t('app.addPrototype')}</button>}{compareGroups(workspace.experiment.frames).length>0&&<button className="compare-toggle" onClick={()=>update({compare:{group:compareGroups(workspace.experiment.frames)[0].name}})}>{t('app.compare')}</button>}<button className="feedback-toggle" onClick={()=>update({comments:!state.comments,inspector:false})}><MessageSquare/>{t('app.comments')} <span>{workspace.feedback.filter(comment=>comment.status==='open').length}</span></button></div></header>
+  <header className="topbar"><button className="workspace-title" onClick={()=>update({info:'workspace'})}>{workspace.experiment.title}</button>{!workspace.readOnly&&<button className="add-frame" onClick={()=>update({newFrame:true})}><Plus/>{t('app.addPrototype')}</button>}</header>
   <div className="canvas" style={{backgroundSize:`${24*state.layout.zoom}px ${24*state.layout.zoom}px`,backgroundPosition:`${state.layout.x}px ${state.layout.y}px`}} onPointerDown={startPan} onWheel={event=>{if(event.target!==event.currentTarget)return;if(event.ctrlKey||event.metaKey){event.preventDefault();zoomBy(event.deltaY>0?.94:1.06);}else setLayout({...state.layout,x:state.layout.x-event.deltaX,y:state.layout.y-event.deltaY});}}>
    <div className="world" style={{transform:state.presenting?'none':`translate(${state.layout.x}px,${state.layout.y}px) scale(${state.layout.zoom})`}}><FlowConnections/>{workspace.experiment.frames.map(frame=><FrameView key={frame.id} frame={frame}/>)}</div>
    {workspace.experiment.frames.length===0&&<div className="empty-canvas"><h1>{t('app.emptyTitle')}</h1><p>{t('app.emptyBody')}</p></div>}
   </div>
-  <nav className="toolbar" aria-label={t('toolbar.label')}><button className={state.mode==='interact'?'active':''} title={t('toolbar.interactTitle')} onClick={()=>setMode('interact')} aria-pressed={state.mode==='interact'}><MousePointer2/><span>{t('toolbar.interact')}</span></button>{!workspace.readOnly&&<><button className={state.mode==='element'?'active':''} title={t('toolbar.inspectTitle')} onClick={()=>setMode('element')} aria-pressed={state.mode==='element'}><Scan/><span>{t('toolbar.inspect')}</span></button><button className={state.mode==='comment'?'active':''} title={t('toolbar.commentTitle')} onClick={()=>setMode('comment')} aria-pressed={state.mode==='comment'}><SquareDashed/><span>{t('toolbar.comment')}</span></button></>}<span className="divider"/><button aria-label={t('toolbar.zoomOut')} onClick={()=>zoomBy(1/1.15)}><Minus/></button><button className="zoom" title={t('toolbar.fitTitle')} onClick={fit}>{Math.round(state.layout.zoom*100)}%</button><button aria-label={t('toolbar.zoomIn')} onClick={()=>zoomBy(1.15)}><Plus/></button><button title={t('toolbar.fitTitle')} aria-label={t('toolbar.fit')} onClick={fit}><Maximize/></button></nav>
+  <nav className="toolbar" aria-label={t('toolbar.label')}><button className={state.mode==='interact'?'active':''} title={t('toolbar.interactTitle')} onClick={()=>setMode('interact')} aria-pressed={state.mode==='interact'}><MousePointer2/><span>{t('toolbar.interact')}</span></button>{!workspace.readOnly&&<><button className={state.mode==='element'?'active':''} title={t('toolbar.inspectTitle')} onClick={()=>setMode('element')} aria-pressed={state.mode==='element'}><Scan/><span>{t('toolbar.inspect')}</span></button><button className={state.mode==='comment'?'active':''} title={t('toolbar.commentTitle')} onClick={()=>setMode('comment')} aria-pressed={state.mode==='comment'}><SquareDashed/><span>{t('toolbar.comment')}</span></button></>}<span className="divider"/><button aria-label={t('toolbar.zoomOut')} onClick={()=>zoomBy(1/1.15)}><Minus/></button><button className="zoom" title={t('toolbar.fitTitle')} onClick={fit}>{Math.round(state.layout.zoom*100)}%</button><button aria-label={t('toolbar.zoomIn')} onClick={()=>zoomBy(1.15)}><Plus/></button><button title={t('toolbar.fitTitle')} aria-label={t('toolbar.fit')} onClick={fit}><Maximize/></button><span className="divider"/>{!workspace.readOnly&&workspace.git===false&&<span className="git-pill" role="status" aria-label={t('git.missing')}>{t('git.short')}</span>}<span className="save-state" role="status">{workspace.readOnly?t('app.readOnly'):state.busy?t('app.saving'):''}</span>{!workspace.readOnly&&<button className="status-toggle" onClick={()=>update({statusOpen:!state.statusOpen})}>{t('status.open')}</button>}{!workspace.readOnly&&workspace.folder&&<button className="connect-toggle" onClick={()=>update({connectOpen:true})}>{t('connect.open')}</button>}<button className="feedback-toggle" onClick={()=>update({comments:!state.comments,inspector:false})}><MessageSquare/>{t('app.comments')} <span>{workspace.feedback.filter(comment=>comment.status==='open').length}</span></button></nav>
   {!!hidden.length&&<details className="hidden-frames"><summary>{t(hidden.length>1?'hidden.many':'hidden.one',{count:hidden.length})}</summary><div className="menu">{hidden.map(frame=><button key={frame.id} onClick={()=>setPosition(frame.id,{...framePosition(frame),hidden:false})}>{t('hidden.restore',{title:frame.title})}</button>)}</div></details>}
   {state.presenting&&<nav className="presentation-controls"><button onClick={leavePresentation}><ArrowLeft/>{t('present.canvas')} <kbd>Esc</kbd></button><span>{workspace.experiment.frames.find(frame=>frame.id===state.presenting)?.title}</span><NextSteps frameId={state.presenting}/><button aria-label={t('present.fullscreen')} onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen();else void document.documentElement.requestFullscreen().catch(()=>update({error:t('present.fullscreenUnavailable')}));}}><Maximize/></button><button onClick={()=>update({comments:!state.comments,inspector:false})}>{t('present.feedback')}</button></nav>}
   {state.mode==='element'&&<div className="mode-hint">{t('hint.inspect')}<button onClick={()=>setMode('interact')}>{t('hint.done')}</button></div>}
   {state.mode==='comment'&&<div className="mode-hint">{t('hint.comment')}<button onClick={()=>setMode('interact')}>{t('hint.done')}</button></div>}
   {(state.notice||state.error||workspace.diagnostics.length>0)&&<div className="notice" role="alert">{[state.notice, state.error ?? workspace.diagnostics.join(' · ')].filter(Boolean).join(' · ')}{state.error&&<button onClick={()=>void discardLayoutConflict()}>{t('notice.reloadLayout')}</button>}{state.notice&&!state.error&&<button onClick={()=>update({notice:undefined})}>{t('notice.close')}</button>}</div>}
-  {workspace.research&&!state.statusOpen&&<aside className="research-note" aria-label={t('research.title')}><h2>{t('research.title')}</h2><Markdown source={workspace.research}/></aside>}
+  <ResearchNote/>
   <MiniMap/><ConnectionControls/><Info/><InspectorPanel/><Comments/><StatusPanel/><NewFrame/><Compare/><ConnectModal/><HistoryPanel/>
  </main>;
 }

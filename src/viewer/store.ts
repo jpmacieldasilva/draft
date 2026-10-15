@@ -14,17 +14,18 @@ export function subscribe(listener: () => void) { listeners.add(listener); retur
 export function snapshot() { return state; }
 export function update(change: Partial<State>) { state = {...state, ...change}; listeners.forEach(listener => listener()); }
 export function framePosition(frame: Frame): Position { return state.layout.frames[frame.id] ?? {...frame.viewport, x: 0, y: 0}; }
+const FRAME_GAP = 96;
 function initialLayout(workspace: Workspace): Layout {
  let x = 0;
- return workspace.layout ?? {zoom: .65, x: 72, y: 130, frames: Object.fromEntries(workspace.experiment.frames.map(frame => { const position = {...frame.viewport, x, y: 0}; x += frame.viewport.width + 64; return [frame.id, position]; }))};
+ return workspace.layout ?? {zoom: .65, x: 72, y: 130, frames: Object.fromEntries(workspace.experiment.frames.map(frame => { const position = {...frame.viewport, x, y: 0}; x += frame.viewport.width + FRAME_GAP; return [frame.id, position]; }))};
 }
 export function acceptWorkspace(workspace: Workspace, first = false) {
  const locale = normalizeLocale(workspace.locale) ?? DEFAULT_LOCALE;
  setLocale(locale); document.documentElement.lang = locale;
  if (first || !layoutDirty) layoutRevision = workspace.revision;
  const layout = first || !layoutDirty ? initialLayout(workspace) : state.layout;
- let nextX = Math.max(0, ...Object.values(layout.frames).map(position => position.x + position.width + 64));
- for (const frame of workspace.experiment.frames) { if (!layout.frames[frame.id]) { layout.frames[frame.id] = {...frame.viewport, x: nextX, y: 0}; nextX += frame.viewport.width + 64; } }
+ let nextX = Math.max(0, ...Object.values(layout.frames).map(position => position.x + position.width + FRAME_GAP));
+ for (const frame of workspace.experiment.frames) { if (!layout.frames[frame.id]) { layout.frames[frame.id] = {...frame.viewport, x: nextX, y: 0}; nextX += frame.viewport.width + FRAME_GAP; } }
  update({workspace, layout, busy: false, error: undefined});
  requestAnimationFrame(()=>iframes.forEach((_iframe,id)=>syncBridge(id)));
  if (first) { if (!workspace.layout) fit(); readRoute(); queueMicrotask(readRoute); }
@@ -78,9 +79,10 @@ export function fit() {
  const positions = frames.map(framePosition);
  const left = Math.min(...positions.map(p=>p.x)), top = Math.min(...positions.map(p=>p.y));
  const width = Math.max(...positions.map(p=>p.x+p.width))-left;
- const height = Math.max(...positions.map(p=>p.y+p.height+48))-top;
- const zoom = Math.min(1, (innerWidth-128)/width, (innerHeight-220)/height);
- setLayout({...state.layout, zoom:Math.max(.15,zoom), x:(innerWidth-width*zoom)/2-left*zoom, y:120-top*zoom}, false);
+ const height = Math.max(...positions.map(p=>p.y+p.height+44))-top;
+ const pad = 96, chromeTop = 84, chromeBottom = 96;
+ const zoom = Math.max(.15, Math.min(1, (innerWidth - pad * 2) / width, (innerHeight - chromeTop - chromeBottom) / height));
+ setLayout({...state.layout, zoom, x:(innerWidth-width*zoom)/2-left*zoom, y:chromeTop + Math.max(0, (innerHeight - chromeTop - chromeBottom - height * zoom) / 2) - top * zoom}, false);
 }
 export function setMode(mode: Mode) { update({mode}); iframes.forEach(iframe => iframe.contentWindow?.postMessage({type:'draftroom:mode', mode}, '*')); }
 export function syncBridge(frameId: string) {

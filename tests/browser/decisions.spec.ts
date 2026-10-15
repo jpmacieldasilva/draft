@@ -151,6 +151,7 @@ test('histórico lista só commits do frame e restaurar volta aquela versão', a
  await git(studio.folder, ['add', 'frames/launcher/index.html']);
  await git(studio.folder, ['commit', '-m', 'launcher only']);
  await page.goto(studio.url);
+ await page.getByRole('button', { name: 'Base clara', exact: true }).click();
  await page.getByLabel('Opções de Base clara').click();
  await page.getByRole('button', { name: 'Histórico', exact: true }).click();
  const dialog = page.getByRole('dialog', { name: 'Histórico do frame' });
@@ -198,6 +199,7 @@ test('pasta sem git mostra aviso e o canvas continua', async ({ page, studio }) 
  await page.goto(studio.url);
  await expect(page.getByRole('status', { name: /não é um repositório Git/ })).toBeVisible();
  await expect(base(page)).toBeVisible();
+ await page.getByRole('button', { name: 'Base clara', exact: true }).click();
  await page.getByLabel('Opções de Base clara').click();
  await page.getByRole('button', { name: 'Histórico', exact: true }).click();
  await expect(page.getByRole('dialog', { name: 'Histórico do frame' })).toContainText('Sem repositório Git');
@@ -222,6 +224,7 @@ test('claim ativo bloqueia salvar no Inspect', async ({ page, studio }) => {
 test('código é somente leitura e a nota de pesquisa entra no contexto', async ({ page, studio }) => {
  await page.goto(studio.url);
  const frame = base(page);
+ await frame.getByRole('button', { name: 'Base clara', exact: true }).click();
  await frame.getByRole('button', { name: 'Código', exact: true }).click();
  const source = frame.locator('pre.frame-source');
  await expect(source).toContainText('Base clara');
@@ -264,7 +267,9 @@ test('comparar mostra papel e decisão em cada frame', async ({ page, studio }) 
  });
  await writeFile(manifestPath, JSON.stringify(manifest));
  await page.goto(studio.url);
- await page.getByRole('button', { name: 'Comparar', exact: true }).click();
+ const variantFrame = lateral(page);
+ await variantFrame.getByRole('button', { name: 'Compacta com barra lateral', exact: true }).click();
+ await variantFrame.getByRole('button', { name: 'Comparar controle e variante', exact: true }).click();
  const dialog = page.getByRole('dialog', { name: 'Comparar controle e variante' });
  await expect(dialog.locator('iframe[title="Controle: Base clara"]')).toBeVisible();
  await expect(dialog.locator('iframe[title="Variante: Compacta com barra lateral"]')).toBeVisible();
