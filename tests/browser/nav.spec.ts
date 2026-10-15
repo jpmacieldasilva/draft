@@ -9,10 +9,10 @@ async function flowStudio(folder: string) {
  const manifestPath = path.join(folder, 'experiment.json');
  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
  manifest.schemaVersion = 2;
- manifest.edges = [{ from: 'editorial', to: 'compact', label: 'Ver lista' }, { from: 'compact', to: 'focus', label: 'Ler agora' }, { from: 'focus', to: 'editorial', label: 'Voltar ao início' }];
+ manifest.edges = [{ from: 'base', to: 'launcher', label: 'Ver lista' }, { from: 'launcher', to: 'mosaico', label: 'Ler agora' }, { from: 'mosaico', to: 'base', label: 'Voltar ao início' }];
  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
- const editorial = path.join(folder, 'frames/editorial/index.html');
- await writeFile(editorial, (await readFile(editorial, 'utf8')).replace('<main>', '<main><a href="#" data-draft-goto="compact">Ir para a lista</a><button data-draft-goto="fantasma">Destino quebrado</button>'));
+ const base = path.join(folder, 'frames/base/index.html');
+ await writeFile(base, (await readFile(base, 'utf8')).replace('<main class="wrap">', '<main class="wrap"><a href="#" data-draft-goto="launcher">Ir para a lista</a><button data-draft-goto="fantasma">Destino quebrado</button>'));
 }
 
 const presentingTitle = (page: Page) => page.locator('.presentation-controls > span');
@@ -21,11 +21,11 @@ test('data-draft-goto navega entre frames na apresentação', async ({ page, wor
  await flowStudio(workspace);
  const viewer = await startViewer(workspace);
  try {
-  await page.goto(`${viewer.url}/#frame/editorial`);
-  await expect(presentingTitle(page)).toHaveText('Biblioteca editorial');
-  await page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('link', { name: 'Ir para a lista' }).click();
-  await expect(page).toHaveURL(/#frame\/compact$/);
-  await expect(presentingTitle(page)).toHaveText('Leitura em movimento');
+  await page.goto(`${viewer.url}/#frame/base`);
+  await expect(presentingTitle(page)).toHaveText('Base clara');
+  await page.frameLocator('iframe[title="Base clara"]').getByRole('link', { name: 'Ir para a lista' }).click();
+  await expect(page).toHaveURL(/#frame\/launcher$/);
+  await expect(presentingTitle(page)).toHaveText('Launcher escuro');
  } finally { viewer.process.kill('SIGTERM'); }
 });
 
@@ -33,11 +33,11 @@ test('destino inexistente avisa e mantém o frame atual', async ({ page, workspa
  await flowStudio(workspace);
  const viewer = await startViewer(workspace);
  try {
-  await page.goto(`${viewer.url}/#frame/editorial`);
-  await page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('button', { name: 'Destino quebrado' }).click();
+  await page.goto(`${viewer.url}/#frame/base`);
+  await page.frameLocator('iframe[title="Base clara"]').getByRole('button', { name: 'Destino quebrado' }).click();
   await expect(page.getByRole('alert')).toContainText('Destino não encontrado: fantasma');
-  await expect(page).toHaveURL(/#frame\/editorial$/);
-  await expect(presentingTitle(page)).toHaveText('Biblioteca editorial');
+  await expect(page).toHaveURL(/#frame\/base$/);
+  await expect(presentingTitle(page)).toHaveText('Base clara');
  } finally { viewer.process.kill('SIGTERM'); }
 });
 
@@ -47,9 +47,9 @@ test('links de fluxo não navegam em Inspecionar', async ({ page, workspace }) =
  try {
   await page.goto(viewer.url);
   await page.getByRole('button', { name: 'Inspecionar', exact: false }).click();
-  await page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('link', { name: 'Ir para a lista' }).click();
+  await page.frameLocator('iframe[title="Base clara"]').getByRole('link', { name: 'Ir para a lista' }).click();
   await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible();
-  await expect(page.locator('article.selected')).toHaveAttribute('data-frame-id', 'editorial');
+  await expect(page.locator('article.selected')).toHaveAttribute('data-frame-id', 'base');
   await expect(page.locator('.presentation-controls')).toHaveCount(0);
  } finally { viewer.process.kill('SIGTERM'); }
 });
@@ -59,8 +59,8 @@ test('no canvas o link de fluxo seleciona o destino', async ({ page, workspace }
  const viewer = await startViewer(workspace);
  try {
   await page.goto(viewer.url);
-  await page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('link', { name: 'Ir para a lista' }).click();
-  await expect(page.locator('article.selected')).toHaveAttribute('data-frame-id', 'compact');
+  await page.frameLocator('iframe[title="Base clara"]').getByRole('link', { name: 'Ir para a lista' }).click();
+  await expect(page.locator('article.selected')).toHaveAttribute('data-frame-id', 'launcher');
   await expect(page.locator('.presentation-controls')).toHaveCount(0);
  } finally { viewer.process.kill('SIGTERM'); }
 });
@@ -69,25 +69,25 @@ test('setas seguem edges, voltam pelo histórico e atravessam ciclos', async ({ 
  await flowStudio(workspace);
  const viewer = await startViewer(workspace);
  try {
-  await page.goto(`${viewer.url}/#frame/editorial`);
-  await expect(presentingTitle(page)).toHaveText('Biblioteca editorial');
+  await page.goto(`${viewer.url}/#frame/base`);
+  await expect(presentingTitle(page)).toHaveText('Base clara');
   await page.locator('.presentation-controls').click({ position: { x: 2, y: 2 } });
   await page.keyboard.press('ArrowRight');
-  await expect(presentingTitle(page)).toHaveText('Leitura em movimento');
+  await expect(presentingTitle(page)).toHaveText('Launcher escuro');
   await page.keyboard.press('ArrowRight');
-  await expect(presentingTitle(page)).toHaveText('Um texto por vez');
+  await expect(presentingTitle(page)).toHaveText('Mosaico colorido');
   await page.keyboard.press('ArrowRight');
-  await expect(presentingTitle(page)).toHaveText('Biblioteca editorial');
+  await expect(presentingTitle(page)).toHaveText('Base clara');
   await page.keyboard.press('ArrowRight');
-  await expect(presentingTitle(page)).toHaveText('Leitura em movimento');
+  await expect(presentingTitle(page)).toHaveText('Launcher escuro');
   await page.keyboard.press('ArrowLeft');
-  await expect(presentingTitle(page)).toHaveText('Biblioteca editorial');
+  await expect(presentingTitle(page)).toHaveText('Base clara');
   await page.keyboard.press('ArrowLeft');
-  await expect(presentingTitle(page)).toHaveText('Um texto por vez');
-  const focus = page.frameLocator('iframe[title="Um texto por vez"]');
-  await focus.getByRole('heading', { level: 1 }).click();
+  await expect(presentingTitle(page)).toHaveText('Mosaico colorido');
+  const mosaico = page.frameLocator('iframe[title="Mosaico colorido"]');
+  await mosaico.getByRole('heading', { name: 'Dentista — Dra. Helena' }).click();
   await page.keyboard.press('ArrowRight');
-  await expect(presentingTitle(page)).toHaveText('Biblioteca editorial');
+  await expect(presentingTitle(page)).toHaveText('Base clara');
  } finally { viewer.process.kill('SIGTERM'); }
 });
 
@@ -95,11 +95,11 @@ test('apresentação lista os próximos passos do fluxo', async ({ page, workspa
  await flowStudio(workspace);
  const viewer = await startViewer(workspace);
  try {
-  await page.goto(`${viewer.url}/#frame/compact`);
+  await page.goto(`${viewer.url}/#frame/launcher`);
   const next = page.getByRole('navigation', { name: 'Próximos passos' });
   await expect(next.getByRole('button')).toHaveText(['Ler agora']);
   await next.getByRole('button', { name: 'Ler agora' }).click();
-  await expect(presentingTitle(page)).toHaveText('Um texto por vez');
+  await expect(presentingTitle(page)).toHaveText('Mosaico colorido');
   await expect(next.getByRole('button')).toHaveText(['Voltar ao início']);
  } finally { viewer.process.kill('SIGTERM'); }
 });
@@ -125,7 +125,7 @@ test('export leva arestas e comentários somente leitura', async ({ page, worksp
  const viewer = await startViewer(workspace);
  const output = await mkdtemp(path.join(tmpdir(), 'draft-export-'));
  try {
-  expect((await api(viewer.url, 'feedback', { frameId: 'compact', message: 'Revisar a ordem.', target: region() })).status).toBe(200);
+  expect((await api(viewer.url, 'feedback', { frameId: 'launcher', message: 'Revisar a ordem.', target: region() })).status).toBe(200);
   viewer.process.kill('SIGTERM');
   expect((await runCli(['export', workspace, path.join(output, 'full')])).code).toBe(0);
   expect((await runCli(['export', workspace, path.join(output, 'clean'), '--no-feedback'])).code).toBe(0);
@@ -139,9 +139,9 @@ test('export leva arestas e comentários somente leitura', async ({ page, worksp
    await page.getByRole('button', { name: /^Comentários/ }).click();
    await expect(page.getByText('Revisar a ordem.', { exact: true })).toBeVisible();
    await expect(page.getByRole('button', { name: 'Resolver', exact: true })).toHaveCount(0);
-   await page.goto(`${server.url}/full/index.html#frame/editorial`);
-   await page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('link', { name: 'Ir para a lista' }).click();
-   await expect(presentingTitle(page)).toHaveText('Leitura em movimento');
+   await page.goto(`${server.url}/full/index.html#frame/base`);
+   await page.frameLocator('iframe[title="Base clara"]').getByRole('link', { name: 'Ir para a lista' }).click();
+   await expect(presentingTitle(page)).toHaveText('Launcher escuro');
   } finally { await server.close(); }
  } finally { viewer.process.kill('SIGTERM'); await rm(output, { recursive: true, force: true }); }
 });

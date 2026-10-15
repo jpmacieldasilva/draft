@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Compacta com barra lateral</title>
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;color:#1d1d1f;background:#fff;display:flex;-webkit-font-smoothing:antialiased}
+aside{width:200px;flex:none;background:#f4f4f2;border-right:1px solid #e6e5e1;padding:14px 10px;display:flex;flex-direction:column;gap:2px}
+.lights{display:flex;gap:7px;padding:2px 6px 16px}.lights i{width:11px;height:11px;border-radius:50%}
+.nav{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px;color:#3a3a3c;cursor:pointer;border:0;background:none;font:inherit;text-align:left;width:100%}
+.nav:hover{background:#ebebe8}.nav.on{background:#e3e3df;font-weight:600}
+.nav i{width:8px;height:8px;border-radius:2px;flex:none}
+.nav b{margin-left:auto;font-weight:500;color:#8a8a8e;font-size:12px}
+.sec{font-size:11px;color:#8a8a8e;padding:12px 8px 4px}
+.foot{margin-top:auto;font-size:11px;color:#8a8a8e;padding:8px}
+main{flex:1;display:flex;flex-direction:column;min-width:0}
+.top{padding:12px 18px;border-bottom:1px solid #eeede9;display:flex;gap:10px;align-items:center}
+.top input{flex:1;border:1px solid #e3e2de;border-radius:8px;padding:8px 11px;font:inherit;outline:0;background:#fafaf9}
+.top input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12);background:#fff}
+.seg{display:flex;border:1px solid #e3e2de;border-radius:8px;overflow:hidden}.seg button{border:0;background:#fff;padding:7px 10px;font:inherit;font-size:12px;color:#555}.seg .on{background:#f0f0ed;color:#111}
+.head{display:flex;align-items:baseline;gap:8px;padding:16px 18px 8px}
+.head h1{font-size:18px}.head span{color:#8a8a8e}.head .sum{margin-left:auto;font-size:12px;color:#555}
+table{width:100%;border-collapse:collapse}
+td{padding:7px 18px;border-bottom:1px solid #f1f0ec;white-space:nowrap}
+tr:hover td{background:#fafaf8}
+.ck{width:15px;height:15px;border:1.5px solid #c9c8c4;border-radius:4px;display:inline-block;vertical-align:-3px}
+.done .ck{background:#1f9d55;border-color:#1f9d55}.done .n{text-decoration:line-through;color:#a0a0a4}
+.w{width:1%}.q{color:#8a8a8e;width:40px}.p{text-align:right;font-variant-numeric:tabular-nums}
+.tag{font-size:11px;border-radius:5px;padding:1px 6px;background:#eef2ff;color:#3b5bdb}
+.tag.r{background:#fdecea;color:#c2361f}.tag.g{background:#e7f6ec;color:#17663a}
+.mini{padding:4px 18px 0;color:#8a8a8e;font-size:11.5px}
+.other td{color:#555}
+</style>
+</head>
+<body>
+<aside>
+  <div class="lights"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+  <button class="nav"><i style="background:#555"></i>Tudo<b>14</b></button>
+  <div class="sec">Tipos</div>
+  <button class="nav"><i style="background:#e0533a"></i>Datas<b>4</b></button>
+  <button class="nav"><i style="background:#3b6cf0"></i>Tarefas<b>3</b></button>
+  <button class="nav on"><i style="background:#22a05a"></i>Compras<b>3</b></button>
+  <button class="nav"><i style="background:#7a5cf0"></i>Links<b>2</b></button>
+  <button class="nav"><i style="background:#d4a300"></i>Notas<b>2</b></button>
+  <div class="sec">Listas</div>
+  <button class="nav"><i style="background:#bbb"></i>Mercado do mês<b>12</b></button>
+  <button class="nav"><i style="background:#bbb"></i>Viagem serra<b>5</b></button>
+  <div class="foot">⌘K para escrever</div>
+</aside>
+<main>
+  <div class="top"><input placeholder="Novo item — “2x leite R$ 5,90”" aria-label="Novo item" data-draftroom-id="entrada"><div class="seg"><button class="on">Lista</button><button>Grade</button></div></div>
+  <div class="head"><h1>Compras</h1><span>3 abertas</span><span class="sum">Faltam <b>R$ 72,30</b></span></div>
+  <table>
+    <tr class="r"><td class="w"><span class="ck"></span></td><td class="q">2×</td><td class="n">Leite integral</td><td><span class="tag g">Mercado</span></td><td class="p">R$ 11,80</td></tr>
+    <tr class="r"><td class="w"><span class="ck"></span></td><td class="q">1×</td><td class="n">Café em grãos</td><td><span class="tag g">Empório</span></td><td class="p">R$ 42,50</td></tr>
+    <tr class="r"><td class="w"><span class="ck"></span></td><td class="q">1×</td><td class="n">Pão de fermentação natural</td><td><span class="tag g">Padaria</span></td><td class="p">R$ 18,00</td></tr>
+    <tr class="r done"><td class="w"><span class="ck"></span></td><td class="q">3×</td><td class="n">Detergente</td><td><span class="tag g">Mercado</span></td><td class="p">R$ 8,37</td></tr>
+  </table>
+  <p class="mini">Também nesta semana</p>
+  <table class="other">
+    <tr><td class="w"><span class="tag r">Qui 15</span></td><td>Dentista — Dra. Helena</td><td class="p">Amanhã</td></tr>
+    <tr><td class="w"><span class="tag r">Sáb 17</span></td><td>Entrega do relatório trimestral</td><td class="p">Em 3 dias</td></tr>
+    <tr><td class="w"><span class="tag">Tarefa</span></td><td>Responder o e-mail do contador</td><td class="p">Hoje</td></tr>
+    <tr><td class="w"><span class="tag">Tarefa</span></td><td>Levar o notebook para revisão</td><td class="p">—</td></tr>
+  </table>
+</main>
+<script>
+document.querySelectorAll('tr.r').forEach(r=>r.addEventListener('click',()=>r.classList.toggle('done')));
+document.querySelectorAll('.nav').forEach(n=>n.addEventListener('click',()=>document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('on',x===n))));
+</script>
+</body>
+</html>

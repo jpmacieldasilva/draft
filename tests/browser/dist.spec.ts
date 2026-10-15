@@ -21,16 +21,16 @@ test('tarball instalado abre o viewer e roda o CLI', async () => {
   expect(files).toContain('dist/runtime/mcp.js');
   expect(files).toContain('dist/viewer/bridge.js');
   expect(files).toContain('dist/viewer/index.html');
-  expect(files).toContain('examples/studio/experiment.json');
+  expect(files).toContain('examples/lista/experiment.json');
   expect(files.filter(file => /^(src|tests|e2e-evidence)\//.test(file) || file.includes('/.draft'))).toEqual([]);
   const project = path.join(temp, 'project');
   await mkdir(project);
   await writeFile(path.join(project, 'package.json'), JSON.stringify({ name: 'consumer', version: '1.0.0', private: true }));
   await exec('npm', ['install', '--no-audit', '--no-fund', path.join(temp, packed.filename)], { cwd: project, maxBuffer: 20 * 1024 * 1024 });
   const bin = path.join(project, 'node_modules/.bin/draft');
-  const example = path.join(project, 'node_modules/draft-viewer/examples/studio');
+  const example = path.join(project, 'node_modules/draft-viewer/examples/lista');
   const inspected = await exec(bin, ['inspect', example]);
-  expect(JSON.parse(inspected.stdout).experiment.frames).toHaveLength(3);
+  expect(JSON.parse(inspected.stdout).experiment.frames).toHaveLength(4);
   const folder = await copyStudio();
   const child = spawn(bin, ['open', folder], { env: { ...process.env, DRAFT_PORT: '0' }, stdio: ['ignore', 'pipe', 'pipe'] });
   try {

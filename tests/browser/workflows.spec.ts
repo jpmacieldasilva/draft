@@ -19,26 +19,27 @@ test('preserva interação entre canvas, apresentação e retorno',async({page})
  const minimapBounds=await page.locator('.minimap').boundingBox();
  if(!toolbarBounds||!minimapBounds)throw new Error('Barra ou minimapa não visível');
  expect(Math.abs(toolbarBounds.y+toolbarBounds.height-(minimapBounds.y+minimapBounds.height))).toBeLessThan(2);
- const frame=page.frameLocator('iframe[title="Biblioteca editorial"]');
- await frame.getByRole('button',{name:'Guardar',exact:true}).click();
- await expect(frame.getByRole('button',{name:'Guardado ✓'})).toBeVisible();
- await page.getByRole('button',{name:'Apresentar Biblioteca editorial',exact:true}).click();
- await expect(page).toHaveURL(/#frame\/editorial$/);
- await expect(frame.getByRole('button',{name:'Guardado ✓'})).toBeVisible();
+ const frame=page.frameLocator('iframe[title="Base clara"]');
+ const row=frame.locator('.row',{hasText:'Responder o e-mail do contador'});
+ await row.click();
+ await expect(row).toHaveClass(/done/);
+ await page.getByRole('button',{name:'Apresentar Base clara',exact:true}).click();
+ await expect(page).toHaveURL(/#frame\/base$/);
+ await expect(row).toHaveClass(/done/);
  await page.getByRole('button',{name:'Tela cheia',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>Boolean(document.fullscreenElement))).toBe(true);
  await page.getByRole('button',{name:/Canvas/}).click();
  await expect.poll(()=>page.evaluate(()=>Boolean(document.fullscreenElement))).toBe(false);
- await expect(frame.getByRole('button',{name:'Guardado ✓'})).toBeVisible();
- await page.getByRole('button',{name:'Um espaço para ler',exact:false}).click();
- await expect(page.getByRole('dialog')).toContainText('Three paths');
+ await expect(row).toHaveClass(/done/);
+ await page.getByRole('button',{name:'Lista que entende o que você escreve',exact:false}).click();
+ await expect(page.getByRole('dialog')).toContainText('Um app de lista minimalista');
  await page.getByRole('button',{name:'Fechar informações'}).click();
 });
 
 test('abre inspector ao selecionar elemento sem misturar comentários',async({page})=>{
  await page.goto(url);
  await page.getByRole('button',{name:'Inspecionar',exact:false}).click();
- await page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('heading',{name:'A arte de prestar atenção'}).click();
+ await page.frameLocator('iframe[title="Base clara"]').getByRole('heading',{name:/^Datas/}).click();
  await expect(page.getByRole('complementary',{name:'Inspector'})).toBeVisible();
  await expect(page.getByRole('button',{name:'Salvar ajuste',exact:true})).toBeVisible();
  await expect(page.getByRole('textbox',{name:'O que precisa mudar?'})).toHaveCount(0);
@@ -46,11 +47,11 @@ test('abre inspector ao selecionar elemento sem misturar comentários',async({pa
 
 test('persiste comentário de região, resolve e reabre na pasta',async({page})=>{
  await page.goto(url);
- await page.getByRole('button',{name:'Biblioteca editorial',exact:true}).click();
+ await page.getByRole('button',{name:'Base clara',exact:true}).click();
  await page.getByRole('button',{name:'Centralizar frames',exact:true}).click();
  await page.getByRole('button',{name:'Comentar',exact:false}).click();
  await expect(page.getByText(/Arraste no protótipo para marcar uma região/)).toBeVisible();
- const iframe=page.locator('iframe[title="Biblioteca editorial"]');
+ const iframe=page.locator('iframe[title="Base clara"]');
  await expect.poll(async()=>{
   const region=await iframe.boundingBox();
   if(!region)return false;
@@ -77,27 +78,27 @@ test('persiste comentário de região, resolve e reabre na pasta',async({page})=
 
 test('recarrega apenas o frame alterado e preserva outro formulário',async({page})=>{
  await page.goto(url);
- const search=page.frameLocator('iframe[title="Leitura em movimento"]').getByRole('textbox');
+ const search=page.frameLocator('iframe[title="Launcher escuro"]').getByRole('textbox');
  await search.fill('intervalo');
- const filename=path.join(folder,'frames/editorial/index.html');
- await writeFile(filename,(await readFile(filename,'utf8')).replace('O que vale','O que merece'));
- await expect(page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('heading',{name:/O que merece/})).toBeVisible();
+ const filename=path.join(folder,'frames/base/index.html');
+ await writeFile(filename,(await readFile(filename,'utf8')).replace('Dentista — Dra. Helena','Dentista — Dra. Marina'));
+ await expect(page.frameLocator('iframe[title="Base clara"]').getByText('Dentista — Dra. Marina')).toBeVisible();
  await expect(search).toHaveValue('intervalo');
 });
 
 test('duplica e oculta uma alternativa sem apagar a fonte',async({page})=>{
  await page.goto(url);
- await page.getByLabel('Opções de Biblioteca editorial').click();
+ await page.getByLabel('Opções de Base clara').click();
  await page.getByRole('button',{name:'Duplicar alternativa',exact:true}).first().click();
- await expect(page.locator('iframe')).toHaveCount(4);
+ await expect(page.locator('iframe')).toHaveCount(5);
  const manifest: {frames:Array<{id:string;title:string}>}=JSON.parse(await readFile(path.join(folder,'experiment.json'),'utf8'));
- expect(manifest.frames).toHaveLength(4);
- expect(await readFile(path.join(folder,'frames/editorial/index.html'),'utf8')).toContain('O que vale');
+ expect(manifest.frames).toHaveLength(5);
+ expect(await readFile(path.join(folder,'frames/base/index.html'),'utf8')).toContain('Dentista — Dra. Helena');
  await page.getByRole('button',{name:'Ocultar do canvas',exact:true}).first().click();
- await expect(page.locator('iframe[title="Biblioteca editorial"]')).toBeHidden();
+ await expect(page.locator('iframe[title="Base clara"]')).toBeHidden();
  await page.getByText('1 oculto',{exact:true}).click();
- await page.getByRole('button',{name:'Restaurar Biblioteca editorial',exact:true}).click();
- await expect(page.locator('iframe[title="Biblioteca editorial"]')).toBeVisible();
+ await page.getByRole('button',{name:'Restaurar Base clara',exact:true}).click();
+ await expect(page.locator('iframe[title="Base clara"]')).toBeVisible();
 });
 
 test('cria uma alternativa pelo viewer sem editar o manifesto',async({page})=>{
@@ -115,23 +116,24 @@ test('cria uma alternativa pelo viewer sem editar o manifesto',async({page})=>{
 
 test('persiste movimento e tamanho do frame',async({page})=>{
  await page.goto(url);
- await page.getByRole('button',{name:'Biblioteca editorial',exact:true}).click();
+ await page.getByRole('button',{name:'Base clara',exact:true}).click();
  await page.keyboard.press('ArrowRight');
- await expect.poll(async()=>JSON.parse(await readFile(path.join(stateDir(folder),'layout.json'),'utf8').catch(()=>'{"frames":{"editorial":{"x":0,"width":390}}}')).frames.editorial.x).toBe(10);
- const handle=page.getByRole('separator',{name:'Redimensionar Biblioteca editorial'});
+ await expect.poll(async()=>JSON.parse(await readFile(path.join(stateDir(folder),'layout.json'),'utf8').catch(()=>'{"frames":{"base":{"x":0,"width":960}}}')).frames.base.x).toBe(10);
+ const handle=page.getByRole('separator',{name:'Redimensionar Base clara'});
  const bounds=await handle.boundingBox();
  if(!bounds)throw new Error('Alça não visível');
- await page.mouse.move(bounds.x+10,bounds.y+10);await page.mouse.down();await page.mouse.move(bounds.x+60,bounds.y+50);await page.mouse.up();
- await expect.poll(async()=>JSON.parse(await readFile(path.join(stateDir(folder),'layout.json'),'utf8').catch(()=>'{"frames":{"editorial":{"x":0,"width":390}}}')).frames.editorial.width).toBeGreaterThan(390);
+ const originX=bounds.x+bounds.width/2, originY=bounds.y+bounds.height/2;
+ await page.mouse.move(originX,originY);await page.mouse.down();await page.mouse.move(originX+120,originY+80);await page.mouse.up();
+ await expect.poll(async()=>JSON.parse(await readFile(path.join(stateDir(folder),'layout.json'),'utf8').catch(()=>'{"frames":{"base":{"x":0,"width":960}}}')).frames.base.width).toBeGreaterThan(960);
 });
 
 test('marca região e persiste comentário',async({page})=>{
  await page.goto(url);
- await page.getByRole('button',{name:'Biblioteca editorial',exact:true}).click();
+ await page.getByRole('button',{name:'Base clara',exact:true}).click();
  await page.getByRole('button',{name:'Centralizar frames',exact:true}).click();
  await page.getByRole('button',{name:'Comentar',exact:false}).click();
  await expect(page.getByText(/Arraste no protótipo para marcar uma região/)).toBeVisible();
- const iframe=page.locator('iframe[title="Biblioteca editorial"]');
+ const iframe=page.locator('iframe[title="Base clara"]');
  await expect.poll(async()=>{
   const region=await iframe.boundingBox();
   if(!region)return false;
@@ -150,8 +152,8 @@ test('marca região e persiste comentário',async({page})=>{
 
 test('bundle estático abre em subpasta sem API e preserva interação',async({page})=>{
  test.setTimeout(60_000);
- const focusHtml=path.join(folder,'frames/focus/index.html');
- await writeFile(focusHtml,(await readFile(focusHtml,'utf8')).replace('<h1 data-draftroom-id="article-title">','<h1 data-draftroom-id="article-title" style="font-size:42px">'));
+ const lateralHtml=path.join(folder,'frames/lateral/index.html');
+ await writeFile(lateralHtml,(await readFile(lateralHtml,'utf8')).replace('<h1>','<h1 style="font-size:42px">'));
  const output=await mkdtemp(path.join(tmpdir(),'draft-export-'));
  const bundle=path.join(output,'bundle');
  const exporter=spawn(process.execPath,['dist/runtime/cli.js','export',folder,bundle]);
@@ -171,11 +173,12 @@ test('bundle estático abre em subpasta sem API e preserva interação',async({p
  const address=staticServer.address();if(!address||typeof address==='string')throw new Error('Porta inválida');
  try {
   await page.goto(`http://127.0.0.1:${address.port}/bundle/index.html`);
-  await page.getByRole('button',{name:'Apresentar Um texto por vez',exact:true}).click();
+  await page.getByRole('button',{name:'Apresentar Compacta com barra lateral',exact:true}).click();
   await expect(page.getByRole('button',{name:/Canvas/})).toBeVisible();
-  await expect(page.frameLocator('iframe[title="Um texto por vez"]').getByRole('heading',{level:1})).toHaveCSS('font-size','42px');
-  await page.frameLocator('iframe[title="Um texto por vez"]').getByRole('button',{name:'Marcar como lido'}).click();
-  await expect(page.frameLocator('iframe[title="Um texto por vez"]').getByRole('button',{name:'Leitura concluída ✓'})).toBeVisible();
+  await expect(page.frameLocator('iframe[title="Compacta com barra lateral"]').getByRole('heading',{level:1})).toHaveCSS('font-size','42px');
+  const row=page.frameLocator('iframe[title="Compacta com barra lateral"]').locator('tr.r',{hasText:'Leite integral'});
+  await row.click();
+  await expect(row).toHaveClass(/done/);
   await page.getByRole('button',{name:/Canvas/}).click();
   await expect(page.getByText('Somente leitura',{exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:/Inspecionar/})).toHaveCount(0);
@@ -184,21 +187,21 @@ test('bundle estático abre em subpasta sem API e preserva interação',async({p
 
 test('sincroniza composição entre abas antes de uma nova alteração',async({page,context})=>{
  await page.goto(url);
- await page.getByRole('button',{name:'Biblioteca editorial',exact:true}).click();
+ await page.getByRole('button',{name:'Base clara',exact:true}).click();
  await page.keyboard.press('ArrowRight');
- await expect.poll(async()=>JSON.parse(await readFile(path.join(stateDir(folder),'layout.json'),'utf8').catch(()=>'{"frames":{"editorial":{"x":0,"width":390}}}')).frames.editorial.x).toBe(10);
+ await expect.poll(async()=>JSON.parse(await readFile(path.join(stateDir(folder),'layout.json'),'utf8').catch(()=>'{"frames":{"base":{"x":0,"width":960}}}')).frames.base.x).toBe(10);
  const second=await context.newPage();await second.goto(url);
- await expect(second.locator('article[aria-label="Biblioteca editorial"]')).toHaveCSS('left','10px');
+ await expect(second.locator('article[aria-label="Base clara"]')).toHaveCSS('left','10px');
  await page.keyboard.press('ArrowRight');
- await expect(second.locator('article[aria-label="Biblioteca editorial"]')).toHaveCSS('left','20px');
- await second.getByRole('button',{name:'Biblioteca editorial',exact:true}).click();
+ await expect(second.locator('article[aria-label="Base clara"]')).toHaveCSS('left','20px');
+ await second.getByRole('button',{name:'Base clara',exact:true}).click();
  await second.keyboard.press('ArrowRight');
- await expect.poll(async()=>JSON.parse(await readFile(path.join(stateDir(folder),'layout.json'),'utf8').catch(()=>'{"frames":{"editorial":{"x":0,"width":390}}}')).frames.editorial.x).toBe(30);
+ await expect.poll(async()=>JSON.parse(await readFile(path.join(stateDir(folder),'layout.json'),'utf8').catch(()=>'{"frames":{"base":{"x":0,"width":960}}}')).frames.base.x).toBe(30);
 });
 
 test('edita visualmente, preserva ajustes sucessivos e restaura o original',async({page})=>{
  await page.goto(url);
- const title=page.frameLocator('iframe[title="Biblioteca editorial"]').getByRole('heading',{name:'A arte de prestar atenção',exact:true});
+ const title=page.frameLocator('iframe[title="Base clara"]').getByRole('heading',{name:/^Datas/});
  await page.getByRole('button',{name:'Inspecionar',exact:false}).click();await title.click();
  await expect(page.getByText('Selecionado',{exact:true})).toBeVisible();
  await expect(page.getByText('Layout',{exact:true})).toHaveCount(0);
@@ -209,12 +212,12 @@ test('edita visualmente, preserva ajustes sucessivos e restaura o original',asyn
  await page.getByText('Espaçamento',{exact:true}).click();
  await page.getByRole('spinbutton',{name:'Espaço interno (px)',exact:true}).fill('12');
  await page.getByRole('button',{name:'Salvar ajuste',exact:true}).click();
- await expect.poll(async()=>/padding:\s*12px/i.test(await readFile(path.join(folder,'frames/editorial/index.html'),'utf8'))).toBe(true);
+ await expect.poll(async()=>/padding:\s*12px/i.test(await readFile(path.join(folder,'frames/base/index.html'),'utf8'))).toBe(true);
  await page.reload();await expect(title).toHaveCSS('font-size','30px');await expect(title).toHaveCSS('padding-top','12px');
  await page.getByRole('button',{name:'Inspecionar',exact:false}).click();await title.click();
  await page.getByRole('button',{name:'Restaurar original',exact:true}).click();
- await expect.poll(async()=>!(/font-size:\s*30px/i.test(await readFile(path.join(folder,'frames/editorial/index.html'),'utf8')))).toBe(true);
- await expect.poll(async()=>await title.evaluate(element=>getComputedStyle(element).fontSize)).toBe('23px');
+ await expect.poll(async()=>!(/font-size:\s*30px/i.test(await readFile(path.join(folder,'frames/base/index.html'),'utf8')))).toBe(true);
+ await expect.poll(async()=>await title.evaluate(element=>getComputedStyle(element).fontSize)).toBe('13px');
  await expect.poll(async()=>await title.evaluate(element=>getComputedStyle(element).paddingTop)).toBe('0px');
 });
 
@@ -223,12 +226,12 @@ test('cria conexão rotulada e navega no minimapa',async({page})=>{
  await expect(page.getByRole('button',{name:'Sobre o espaço',exact:true})).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Região',exact:true})).toHaveCount(0);
  await expect(page.getByText('Pasta local',{exact:true})).toHaveCount(0);
- await page.locator('[data-frame-connector="editorial"]').click();
- await page.locator('[data-frame-connector="compact"]').click();
+ await page.locator('[data-frame-connector="base"]').click();
+ await page.locator('[data-frame-connector="launcher"]').click();
  await page.getByRole('textbox',{name:'Rótulo',exact:true}).fill('Escolher um texto');
  await page.getByRole('button',{name:'Salvar conexão',exact:true}).click();
  await expect(page.locator('.flow-label')).toHaveText('Escolher um texto');
- await expect.poll(async()=>JSON.parse(await readFile(path.join(folder,'experiment.json'),'utf8')).edges?.[0]).toEqual({from:'editorial',to:'compact',label:'Escolher um texto'});
+ await expect.poll(async()=>JSON.parse(await readFile(path.join(folder,'experiment.json'),'utf8')).edges?.[0]).toEqual({from:'base',to:'launcher',label:'Escolher um texto'});
  expect(JSON.parse(await readFile(path.join(stateDir(folder),'layout.json'),'utf8').catch(()=>'{}')).connections).toBeUndefined();
  await page.reload();await expect(page.locator('.flow-label')).toHaveText('Escolher um texto');
  const world=page.locator('.world');const previous=await world.getAttribute('style');
@@ -239,20 +242,22 @@ test('cria conexão rotulada e navega no minimapa',async({page})=>{
 
 test('altera viewport por preset sem recarregar o protótipo',async({page})=>{
  await page.goto(url);
- const frame=page.frameLocator('iframe[title="Biblioteca editorial"]');
- await frame.getByRole('button',{name:'Guardar',exact:true}).click();
- await page.getByLabel('Viewport de Biblioteca editorial', {exact:true}).click();
+ const frame=page.frameLocator('iframe[title="Base clara"]');
+ const row=frame.locator('.row',{hasText:'Responder o e-mail do contador'});
+ await row.click();
+ await page.getByLabel('Viewport de Base clara', {exact:true}).click();
  await page.getByRole('button',{name:'Tablet',exact:true}).click();
- await expect(page.locator('iframe[title="Biblioteca editorial"]')).toHaveCSS('width','768px');
- await expect(frame.getByRole('button',{name:'Guardado ✓'})).toBeVisible();
+ await expect(page.locator('iframe[title="Base clara"]')).toHaveCSS('width','768px');
+ await expect(row).toHaveClass(/done/);
 });
 
 test('puxa uma curva entre protótipos e remove a conexão',async({page})=>{
  await page.goto(url);
- const start=await page.locator('[data-frame-connector="editorial"]').boundingBox();
- const end=await page.locator('iframe[title="Leitura em movimento"]').boundingBox();
+ await page.getByRole('button',{name:'Centralizar frames',exact:true}).click();
+ const start=await page.locator('[data-frame-connector="base"]').boundingBox();
+ const end=await page.locator('[data-frame-connector="launcher"]').boundingBox();
  if(!start||!end)throw new Error('Frames não visíveis');
- await page.mouse.move(start.x+14,start.y+14);await page.mouse.down();await page.mouse.move(end.x+30,end.y+100,{steps:12});await page.mouse.up();
+ await page.mouse.move(start.x+start.width/2,start.y+start.height/2);await page.mouse.down();await page.mouse.move(end.x+end.width/2,end.y+end.height/2,{steps:12});await page.mouse.up();
  await expect(page.getByRole('button',{name:'Salvar conexão',exact:true})).toBeVisible();
  await page.getByRole('textbox',{name:'Rótulo',exact:true}).fill('Abrir biblioteca');
  await page.getByRole('button',{name:'Salvar conexão',exact:true}).click();

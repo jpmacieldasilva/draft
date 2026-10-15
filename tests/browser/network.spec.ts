@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 async function remoteImage(folder: string, host: string) {
- const file = path.join(folder, 'frames/focus/index.html');
+ const file = path.join(folder, 'frames/lateral/index.html');
  await writeFile(file, (await readFile(file, 'utf8')).replace('<main>', `<main><img src="https://${host}/pixel.png" alt="remoto" width="10" height="10">`));
 }
 async function allowNetwork(folder: string, hosts: unknown[]) {
@@ -21,10 +21,10 @@ test('recurso remoto bloqueado mostra aviso no frame', async ({ page, workspace 
  const viewer = await startViewer(workspace);
  try {
   await page.goto(viewer.url);
-  const warning = page.locator('article[data-frame-id="focus"] .frame-warning');
+  const warning = page.locator('article[data-frame-id="lateral"] .frame-warning');
   await expect(warning).toContainText('cdn.example.invalid');
   await expect(warning).toContainText('allowNetwork');
-  await expect(page.locator('article[data-frame-id="editorial"] .frame-warning')).toHaveCount(0);
+  await expect(page.locator('article[data-frame-id="base"] .frame-warning')).toHaveCount(0);
  } finally { viewer.process.kill('SIGTERM'); }
 });
 
@@ -32,7 +32,7 @@ test('allowNetwork recusa entradas perigosas', async ({ page, workspace }) => {
  await allowNetwork(workspace, ['*', 'http://evil.example', 'a b', "'unsafe-eval'", 'data:', '*.example.org', 'fonts.example.com', 42]);
  const viewer = await startViewer(workspace);
  try {
-  const csp = await frameCsp(viewer.url, 'editorial');
+  const csp = await frameCsp(viewer.url, 'base');
   expect(csp).toContain('https://fonts.example.com');
   expect(csp).toContain('https://*.example.org');
   expect(csp).not.toContain('evil.example');
@@ -50,10 +50,10 @@ test('host liberado entra na CSP e não gera aviso', async ({ page, workspace })
  await allowNetwork(workspace, ['cdn.example.invalid']);
  const viewer = await startViewer(workspace);
  try {
-  const csp = await frameCsp(viewer.url, 'focus');
+  const csp = await frameCsp(viewer.url, 'lateral');
   for (const directive of ['img-src', 'style-src', 'font-src', 'script-src', 'connect-src', 'media-src']) expect(csp).toMatch(new RegExp(`${directive}[^;]*https://cdn\\.example\\.invalid`));
   await page.goto(viewer.url);
-  await expect(page.frameLocator('iframe[title="Um texto por vez"]').getByRole('img', { name: 'remoto' })).toBeAttached();
+  await expect(page.frameLocator('iframe[title="Compacta com barra lateral"]').getByRole('img', { name: 'remoto' })).toBeAttached();
   await page.waitForTimeout(1500);
   await expect(page.locator('.frame-warning')).toHaveCount(0);
   await expect(page.getByRole('alert')).toHaveCount(0);

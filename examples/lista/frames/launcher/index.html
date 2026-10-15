@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Launcher escuro</title>
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;color:#ececf1;-webkit-font-smoothing:antialiased;display:grid;place-items:center;overflow:hidden;
+background:radial-gradient(60% 70% at 15% 20%,#f4b6c8 0,transparent 60%),radial-gradient(55% 60% at 85% 25%,#a9b8ff 0,transparent 60%),radial-gradient(70% 70% at 60% 95%,#ffd6a5 0,transparent 60%),#c9c2e8}
+body::before{content:"";position:fixed;inset:0;background:rgba(20,18,30,.18)}
+.palette{position:relative;width:min(680px,92vw);background:rgba(28,28,32,.86);backdrop-filter:blur(30px) saturate(1.4);-webkit-backdrop-filter:blur(30px) saturate(1.4);border:1px solid rgba(255,255,255,.10);border-radius:16px;box-shadow:0 30px 80px -20px rgba(20,10,50,.55),inset 0 1px 0 rgba(255,255,255,.06);overflow:hidden}
+.search{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.07)}
+.search svg{flex:none;opacity:.55}
+.search input{flex:1;background:none;border:0;outline:0;color:#fff;font:inherit;font-size:17px}
+.search input::placeholder{color:#7d7d86}
+.type{font-size:11.5px;padding:3px 9px;border-radius:6px;background:rgba(255,255,255,.08);color:#b9b9c3}
+.list{padding:6px;max-height:420px;overflow:auto}
+.group{font-size:11.5px;color:#7d7d86;padding:10px 12px 5px;font-weight:500}
+.item{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:9px;cursor:default}
+.item.sel{background:rgba(255,255,255,.09)}
+.ic{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;font-size:12px;font-weight:600;flex:none}
+.name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.done .name{color:#6f6f78;text-decoration:line-through}
+.meta{font-size:12.5px;color:#8b8b95;font-variant-numeric:tabular-nums}
+.meta.red{color:#ff7b6b}
+.action{display:none;font-size:12px;color:#b9b9c3;gap:6px;align-items:center}
+.sel .action{display:flex}.sel .meta{display:none}
+kbd{font:inherit;font-size:11px;min-width:20px;text-align:center;padding:1px 5px;border-radius:5px;background:rgba(255,255,255,.10);color:#d8d8e0;border:1px solid rgba(255,255,255,.06)}
+.foot{display:flex;align-items:center;gap:16px;padding:10px 16px;border-top:1px solid rgba(255,255,255,.07);background:rgba(0,0,0,.18);font-size:12px;color:#8b8b95}
+.foot .brand{display:flex;align-items:center;gap:8px;color:#c9c9d2;margin-right:auto}
+.dot{width:16px;height:16px;border-radius:5px;background:linear-gradient(135deg,#ff9a8b,#a18cd1)}
+.foot span{display:flex;align-items:center;gap:6px}
+</style>
+</head>
+<body>
+<div class="palette" role="dialog" aria-label="Lista">
+  <div class="search">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input placeholder="Escreva ou busque — “sexta: dentista”, “2x leite R$ 5,90”" aria-label="Escrever ou buscar" data-draftroom-id="entrada">
+    <span class="type">Tudo · 14</span>
+  </div>
+  <div class="list" id="list">
+    <div class="group">Próximas datas</div>
+    <div class="item sel"><span class="ic" style="background:#3a1f1f;color:#ff7b6b">15</span><span class="name">Dentista — Dra. Helena</span><span class="meta red">Amanhã</span><span class="action">Abrir <kbd>↵</kbd></span></div>
+    <div class="item"><span class="ic" style="background:#3a1f1f;color:#ff9b8b">17</span><span class="name">Entrega do relatório trimestral</span><span class="meta">Em 3 dias</span><span class="action">Abrir <kbd>↵</kbd></span></div>
+    <div class="item"><span class="ic" style="background:#3a1f1f;color:#ff9b8b">19</span><span class="name">Aniversário da Marina</span><span class="meta">Em 5 dias</span><span class="action">Abrir <kbd>↵</kbd></span></div>
+    <div class="group">Tarefas</div>
+    <div class="item"><span class="ic" style="background:#1d2a44;color:#7aa5ff">○</span><span class="name">Responder o e-mail do contador</span><span class="meta">Hoje</span><span class="action">Concluir <kbd>⌘</kbd><kbd>↵</kbd></span></div>
+    <div class="item"><span class="ic" style="background:#1d2a44;color:#7aa5ff">○</span><span class="name">Marcar call com o time de design</span><span class="meta">—</span><span class="action">Concluir <kbd>⌘</kbd><kbd>↵</kbd></span></div>
+    <div class="group">Compras · faltam R$ 72,30</div>
+    <div class="item"><span class="ic" style="background:#16301f;color:#5fd38d">2×</span><span class="name">Leite integral</span><span class="meta">R$ 11,80</span><span class="action">Marcar <kbd>Espaço</kbd></span></div>
+    <div class="item"><span class="ic" style="background:#16301f;color:#5fd38d">1×</span><span class="name">Café em grãos</span><span class="meta">R$ 42,50</span><span class="action">Marcar <kbd>Espaço</kbd></span></div>
+    <div class="group">Links e notas</div>
+    <div class="item"><span class="ic" style="background:#6d4aff;color:#fff">D</span><span class="name">Human Interface Guidelines — Layout</span><span class="meta">developer.apple.com</span><span class="action">Abrir link <kbd>↵</kbd></span></div>
+    <div class="item"><span class="ic" style="background:#3b3420;color:#ffd166">✎</span><span class="name">Subir a serra no sábado cedo, almoçar em Monte Verde…</span><span class="meta">há 3 h</span><span class="action">Editar <kbd>↵</kbd></span></div>
+  </div>
+  <div class="foot">
+    <span class="brand"><i class="dot"></i>Lista</span>
+    <span><kbd>↑</kbd><kbd>↓</kbd> navegar</span>
+    <span><kbd>↵</kbd> abrir</span>
+    <span><kbd>Tab</kbd> tipo</span>
+    <span><kbd>⌘</kbd><kbd>K</kbd> fechar</span>
+  </div>
+</div>
+<script>
+const items=[...document.querySelectorAll('.item')];let i=0;
+const set=n=>{i=(n+items.length)%items.length;items.forEach((x,k)=>x.classList.toggle('sel',k===i));items[i].scrollIntoView({block:'nearest'})};
+items.forEach((x,k)=>x.addEventListener('mousemove',()=>set(k)));
+document.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();set(i+1)}if(e.key==='ArrowUp'){e.preventDefault();set(i-1)}if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))items[i].classList.toggle('done')});
+</script>
+</body>
+</html>

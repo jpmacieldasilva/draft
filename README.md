@@ -15,7 +15,7 @@ npx draft-viewer create my-study "My study"
 npx draft-viewer open my-study
 ```
 
-Or run the included studio from a clone:
+Or run the included example from a clone:
 
 ```bash
 git clone https://github.com/jpmacieldasilva/draft.git
@@ -24,7 +24,7 @@ npm ci
 npm run demo
 ```
 
-Opens the included studio study (`examples/studio`). Copy that folder when you start your own work — not the whole repository.
+Opens the included lista study (`examples/lista`). Copy that folder when you start your own work — not the whole repository.
 
 ## What you get
 
@@ -54,7 +54,7 @@ You do **not** need this repository if someone else runs the viewer. You need a 
 
 Ask any agent: *“Start Draft for this folder.”*
 
-→ [Studio example](examples/studio/) · [Workspace agent notes](examples/studio/AGENTS.md)
+→ [Lista example](examples/lista/) · [Workspace agent notes](examples/lista/AGENTS.md)
 
 ## Portable workspace
 
@@ -127,7 +127,7 @@ The viewer, the CLI and the agent rules speak Brazilian Portuguese (default) and
 ```bash
 npm ci
 npm run build
-draft open examples/studio    # or: npm run demo
+draft open examples/lista    # or: npm run demo
 draft create /path/to/canvas "Title"
 draft inspect /path/to/workspace
 draft context /path/to/workspace          # what an agent should read before editing
@@ -157,7 +157,7 @@ There is no magic phrase. When the user wants to **use Draft** — start the vie
 2. **Node:** If Node is older than 22.12, stop and tell the user the required version only.
 3. **Build once:** In the Draft clone, if `dist/runtime/cli.js` is missing, run `npm ci` and `npm run build`. If it already exists, skip install.
 4. **Open the canvas:**
-   - If the open folder **is** this Draft repository (`package.json` name `draft-viewer`), run `node dist/runtime/cli.js open examples/studio`.
+   - If the open folder **is** this Draft repository (`package.json` name `draft-viewer`), run `node dist/runtime/cli.js open examples/lista`.
    - If the open folder is **another project** (e.g. a Flutter app), ensure `<project>/canvas/` exists: if not, run `node <draft-clone>/dist/runtime/cli.js create <project>/canvas "<project name or Canvas>"`. Then run `node <draft-clone>/dist/runtime/cli.js open <project>/canvas`.
 5. **Reply** with the printed URL (default `http://127.0.0.1:4173`) and keep the server process running until the user stops it.
 6. Do **not** change existing `frames/` unless the user asks. Do **not** ask the user to run these commands manually.
@@ -166,8 +166,8 @@ After a successful run from this repository, copy [`.cursor/skills/use-draft/`](
 
 | Situation | What the user does | What opens |
 | --- | --- | --- |
-| Nothing on the machine yet | Sends the Git link and asks to use Draft | Agent clones, builds, opens `examples/studio` |
-| This repo already cloned | Opens the clone and asks to use Draft | `examples/studio` (no second clone) |
+| Nothing on the machine yet | Sends the Git link and asks to use Draft | Agent clones, builds, opens `examples/lista` |
+| This repo already cloned | Opens the clone and asks to use Draft | `examples/lista` (no second clone) |
 | Another app project | Opens that project and asks to use Draft | `canvas/` inside that project (viewer reused) |
 
 One Draft clone per computer. Each app gets its own `canvas/` (`experiment.json` + `frames/`).

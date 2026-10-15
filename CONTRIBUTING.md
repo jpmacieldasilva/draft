@@ -5,7 +5,7 @@ Thanks for helping improve Draft.
 ## Before you start
 
 - Read [README.md](README.md) for the workspace model and limits.
-- For a portable study folder, copy [`examples/studio/`](examples/studio/) — not the whole repository.
+- For a portable study folder, copy [`examples/lista/`](examples/lista/) — not the whole repository.
 
 ## Development setup
 

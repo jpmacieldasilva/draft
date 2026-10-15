@@ -29,7 +29,7 @@ The user wants to **use Draft**: run the viewer, open the canvas, preview or exp
 3. **Build once:** In the Draft clone directory, if `dist/runtime/cli.js` is missing, run `npm ci` then `npm run build`.
 
 4. **Choose workspace folder:**
-   - **Draft tool repo** (has `src/`, `tests/`, `draft-viewer` in `package.json`): workspace is `examples/studio` relative to that clone.
+   - **Draft tool repo** (has `src/`, `tests/`, `draft-viewer` in `package.json`): workspace is `examples/lista` relative to that clone.
    - **Any other project:** workspace is `canvas/` in the project root. If `canvas/experiment.json` does not exist, run:
      `node <draft-clone>/dist/runtime/cli.js create <project-root>/canvas "<title>"`
      Use the folder or project name as title when unsure.

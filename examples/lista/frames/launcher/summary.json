@@ -1,0 +1,10 @@
+{
+  "text": "Montei o launcher escuro: a paleta abre centralizada sobre um gradiente suave, com a busca no topo, resultados agrupados por tipo e atalhos visíveis no rodapé (↑↓ para navegar, ↵ para abrir, ⌘K para alternar). O item em foco fica destacado e mostra a ação principal à direita.",
+  "submittedAt": "2026-10-14T21:40:00.000Z",
+  "actor": "Cursor",
+  "assumptions": [
+    { "id": "a1", "text": "Mantive só o tema escuro nesta variante; não criei um par claro.", "status": "pending" },
+    { "id": "a2", "text": "Limitei a lista a 8 resultados visíveis e deixei o resto atrás de \"Ver todos\".", "status": "pending" },
+    { "id": "a3", "text": "Usei ⌘K como atalho global, assumindo uso principal no macOS.", "status": "accepted" }
+  ]
+}

@@ -1,8 +1,8 @@
 # Workspace instructions (Draft)
 
-This folder is a **portable Draft workspace** — prototypes and manifest only, not the viewer source code.
+This folder is a portable Draft workspace — prototypes and manifest only, not the viewer source code.
 
-When the user wants to use Draft for **this folder**, follow the repository skill [`.cursor/skills/use-draft/SKILL.md`](../../.cursor/skills/use-draft/SKILL.md) but open **this directory** (`.`) instead of `examples/studio` or `canvas/`.
+When the user wants to use Draft for **this folder**, follow the repository skill [`.cursor/skills/use-draft/SKILL.md`](../../.cursor/skills/use-draft/SKILL.md) but open **this directory** (`.`) instead of `canvas/`.
 
 1. **Preserve** every file in this workspace. Do not delete, move, or rewrite `experiment.json`, frames, or `.draft/` without explicit permission.
 2. **Validate** with `draft inspect .` when a runtime is available.
