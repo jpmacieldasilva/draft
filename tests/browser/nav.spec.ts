@@ -117,7 +117,7 @@ async function serveStatic(root: string) {
  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
  const address = server.address();
  if (!address || typeof address === 'string') throw new Error('Porta inválida');
- return { url: `http://127.0.0.1:${address.port}`, close: () => new Promise<void>(resolve => server.close(() => resolve())) };
+ return { url: `http://127.0.0.1:${address.port}`, close: () => new Promise<void>(resolve => { server.close(() => resolve()); server.closeAllConnections(); }) };
 }
 
 test('export leva arestas e comentários somente leitura', async ({ page, workspace }) => {

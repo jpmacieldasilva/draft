@@ -2,7 +2,11 @@ node_modules/
 dist/
 lib/
 legacy/
-docs/
+docs/*
+!docs/ui/
+docs/ui/*
+!docs/ui/layer-1/
+!docs/ui/layer-1/**
 *.tgz
 test-results/
 playwright-report/

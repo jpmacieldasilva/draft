@@ -45,7 +45,7 @@ function resizeViewport(event:FormEvent<HTMLFormElement>,frame:Frame) {
 }
 function ViewportControls({frame}:{frame:Frame}) {
  const state=useStore(),position=framePosition(frame);
- return <details className="viewport-menu"><summary aria-label={t('viewport.label',{title:frame.title})} title={t('viewport.title')}>{position.width} × {position.height}</summary><div className="menu viewport-panel"><strong>{t('viewport.heading')}</strong><form key={`${position.width}:${position.height}`} onSubmit={event=>resizeViewport(event,frame)}><div className="viewport-fields"><label>{t('viewport.width')}<input name="width" type="number" min="160" max="4000" defaultValue={position.width}/></label><label>{t('viewport.height')}<input name="height" type="number" min="120" max="4000" defaultValue={position.height}/></label></div><button type="submit" disabled={state.workspace?.readOnly}>{t('viewport.apply')}</button></form><div className="viewport-presets">{[{label:t('viewport.phone'),width:390,height:844},{label:t('viewport.tablet'),width:768,height:1024},{label:t('viewport.desktop'),width:1440,height:900}].map(preset=><button key={preset.label} disabled={state.workspace?.readOnly} onClick={()=>setPosition(frame.id,{...position,width:preset.width,height:preset.height})}>{preset.label}</button>)}</div><button disabled={state.workspace?.readOnly} onClick={()=>setPosition(frame.id,{...position,...frame.viewport})}>{t('viewport.reset')}</button></div></details>;
+ return <details className="viewport-menu"><summary data-testid="frame-action-viewport" aria-label={t('viewport.label',{title:frame.title})} title={t('viewport.title')}>{position.width} × {position.height}</summary><div className="menu viewport-panel"><strong>{t('viewport.heading')}</strong><form key={`${position.width}:${position.height}`} onSubmit={event=>resizeViewport(event,frame)}><div className="viewport-fields"><label>{t('viewport.width')}<input name="width" type="number" min="160" max="4000" defaultValue={position.width}/></label><label>{t('viewport.height')}<input name="height" type="number" min="120" max="4000" defaultValue={position.height}/></label></div><button type="submit" disabled={state.workspace?.readOnly}>{t('viewport.apply')}</button></form><div className="viewport-presets">{[{label:t('viewport.phone'),width:390,height:844},{label:t('viewport.tablet'),width:768,height:1024},{label:t('viewport.desktop'),width:1440,height:900}].map(preset=><button key={preset.label} disabled={state.workspace?.readOnly} onClick={()=>setPosition(frame.id,{...position,width:preset.width,height:preset.height})}>{preset.label}</button>)}</div><button disabled={state.workspace?.readOnly} onClick={()=>setPosition(frame.id,{...position,...frame.viewport})}>{t('viewport.reset')}</button></div></details>;
 }
 function renameFrame(event:FormEvent<HTMLFormElement>, frameId:string) {
  event.preventDefault(); const title=new FormData(event.currentTarget).get('title'); if(typeof title==='string' && title.trim()) void mutate(`frames/${encodeURIComponent(frameId)}/rename`,{title:title.trim()});
@@ -73,20 +73,20 @@ function FrameView({frame}:{frame:Frame}) {
  const activity = state.workspace ? frameActivity(frame.id, state.workspace) : null;
  const showingCode = !!state.code[frame.id];
  return <article className={`frame ${presenting?'presenting':''} ${state.selected===frame.id?'selected':''}${claim?' agent-active':''}`} style={{left:position.x,top:position.y,width:position.width,height:position.height+44,display:position.hidden&&!presenting?'none':undefined}} aria-label={frame.title} data-frame-id={frame.id} title={claim ? t('frame.agentHere') : undefined}>
-  <header className="frame-header" onPointerDown={event=>startMove(event,frame)}>
-   <button className="frame-title" onClick={()=>update({selected:frame.id})}>{frame.title}</button>
-   {frame.state&&<span className="frame-badge frame-state" title={t('frame.stateTitle')}>{frame.state}</span>}
-   {frame.role&&<span className={`frame-badge frame-role-${frame.role}`} title={frame.group?t('frame.groupTitle',{group:frame.group}):undefined}>{t(`role.${frame.role}`)}</span>}
-   {activity&&<span className={`frame-badge frame-activity frame-activity-${activity}`} data-activity={activity}>{t(activity==='needs-you'?'status.needsYou':activity==='working'?'status.working':'status.ready')}</span>}
-   {claim&&<span className="agent-pill" title={t('frame.agentHere')}>{t('frame.agent')}</span>}
+  <header className="frame-header" data-testid="frame-header" onPointerDown={event=>startMove(event,frame)}>
+   <button className="frame-title" data-testid="frame-action-title" onClick={()=>update({selected:frame.id})}>{frame.title}</button>
+   {frame.state&&<span className="frame-badge frame-state" data-testid="frame-state" title={t('frame.stateTitle')}>{frame.state}</span>}
+   {frame.role&&<span className={`frame-badge frame-role-${frame.role}`} data-testid="frame-role" title={frame.group?t('frame.groupTitle',{group:frame.group}):undefined}>{t(`role.${frame.role}`)}</span>}
+   {activity&&<span className={`frame-badge frame-activity frame-activity-${activity}`} data-testid="frame-activity" data-activity={activity}>{t(activity==='needs-you'?'status.needsYou':activity==='working'?'status.working':'status.ready')}</span>}
+   {claim&&<span className="agent-pill" data-testid="frame-agent" title={t('frame.agentHere')}>{t('frame.agent')}</span>}
    <ViewportControls frame={frame}/>
-   <button className="icon-button" aria-label={t('frame.info',{title:frame.title})} title={t('frame.infoTitle')} onClick={()=>update({info:frame.id})}><InfoIcon/></button>
-   <button className="icon-button" aria-label={t('frame.present',{title:frame.title})} title={t('frame.presentTitle')} onClick={()=>present(frame.id)}><Play/></button>
-   {!state.workspace?.readOnly&&<details className="frame-menu"><summary aria-label={t('frame.options',{title:frame.title})}><MoreHorizontal/></summary><div className="menu">
-    <form onSubmit={event=>renameFrame(event,frame.id)}><label>{t('frame.newTitle')}<input name="title" defaultValue={frame.title} required maxLength={120}/></label><button type="submit">{t('frame.rename')}</button></form>
-    <button onClick={()=>void mutate(`frames/${encodeURIComponent(frame.id)}/duplicate`,{})}>{t('frame.duplicate')}</button>
-    <button onClick={()=>setPosition(frame.id,{...position,hidden:true})}>{t('frame.hide')}</button>
-    <button onClick={()=>update({historyFrame:frame.id})}>{t('frame.history')}</button>
+   <button className="icon-button" data-testid="frame-action-info" aria-label={t('frame.info',{title:frame.title})} title={t('frame.infoTitle')} onClick={()=>update({info:frame.id})}><InfoIcon/></button>
+   <button className="icon-button" data-testid="frame-action-present" aria-label={t('frame.present',{title:frame.title})} title={t('frame.presentTitle')} onClick={()=>present(frame.id)}><Play/></button>
+   {!state.workspace?.readOnly&&<details className="frame-menu"><summary data-testid="frame-action-options" aria-label={t('frame.options',{title:frame.title})}><MoreHorizontal/></summary><div className="menu">
+    <form onSubmit={event=>renameFrame(event,frame.id)}><label>{t('frame.newTitle')}<input name="title" defaultValue={frame.title} required maxLength={120}/></label><button type="submit" data-testid="frame-action-rename">{t('frame.rename')}</button></form>
+    <button data-testid="frame-action-duplicate" onClick={()=>void mutate(`frames/${encodeURIComponent(frame.id)}/duplicate`,{})}>{t('frame.duplicate')}</button>
+    <button data-testid="frame-action-hide" onClick={()=>setPosition(frame.id,{...position,hidden:true})}>{t('frame.hide')}</button>
+    <button data-testid="frame-action-history" onClick={()=>update({historyFrame:frame.id})}>{t('frame.history')}</button>
    </div></details>}
   </header>
   {!!state.blocked[frame.id]?.length&&<p className="frame-warning" role="status">{t('frame.blocked',{hosts:state.blocked[frame.id].join(', ')})}</p>}

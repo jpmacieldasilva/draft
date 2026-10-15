@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
-const SHOTS = '/opt/cursor/artifacts/screenshots';
+const SHOTS = process.env.DRAFT_SHOTS ?? 'test-results/screenshots';
 
 async function shot(page: import('@playwright/test').Page, name: string) {
  await mkdir(SHOTS, { recursive: true });
