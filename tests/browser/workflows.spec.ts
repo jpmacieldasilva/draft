@@ -51,7 +51,7 @@ test('persiste comentário de região, resolve e reabre na pasta',async({page})=
  await page.getByRole('button',{name:'Base clara',exact:true}).click();
  await page.getByRole('button',{name:'Centralizar frames',exact:true}).click();
  await page.getByRole('button',{name:'Comentar',exact:false}).click();
- await expect(page.getByText(/Arraste no protótipo para marcar uma região/)).toBeVisible();
+ await expect(page.getByRole('button',{name:'Comentar',exact:false})).toHaveAttribute('aria-pressed','true');
  const iframe=page.locator('iframe[title="Base clara"]');
  await expect.poll(async()=>{
   const region=await iframe.boundingBox();
@@ -60,7 +60,7 @@ test('persiste comentário de região, resolve e reabre na pasta',async({page})=
   await page.mouse.down();
   await page.mouse.move(region.x+region.width-50,region.y+region.height-60,{steps:15});
   await page.mouse.up();
-  return page.getByText('Região selecionada').isVisible();
+  return page.getByRole('textbox',{name:'O que precisa mudar?'}).isVisible();
  },{timeout:15_000}).toBe(true);
  await page.getByRole('textbox',{name:'O que precisa mudar?'}).fill('Dar mais espaço ao título.');
  await page.getByRole('button',{name:'Salvar comentário'}).click();
@@ -134,7 +134,7 @@ test('marca região e persiste comentário',async({page})=>{
  await page.getByRole('button',{name:'Base clara',exact:true}).click();
  await page.getByRole('button',{name:'Centralizar frames',exact:true}).click();
  await page.getByRole('button',{name:'Comentar',exact:false}).click();
- await expect(page.getByText(/Arraste no protótipo para marcar uma região/)).toBeVisible();
+ await expect(page.getByRole('button',{name:'Comentar',exact:false})).toHaveAttribute('aria-pressed','true');
  const iframe=page.locator('iframe[title="Base clara"]');
  await expect.poll(async()=>{
   const region=await iframe.boundingBox();
@@ -143,7 +143,7 @@ test('marca região e persiste comentário',async({page})=>{
   await page.mouse.down();
   await page.mouse.move(region.x+region.width-50,region.y+region.height-60,{steps:15});
   await page.mouse.up();
-  return page.getByText('Região selecionada').isVisible();
+  return page.getByRole('textbox',{name:'O que precisa mudar?'}).isVisible();
  },{timeout:15_000}).toBe(true);
  await expect(page.getByRole('textbox',{name:'O que precisa mudar?'})).toBeVisible();
  await page.getByRole('textbox',{name:'O que precisa mudar?'}).fill('Rever o espaço desta região.');
@@ -210,7 +210,7 @@ test('edita visualmente, preserva ajustes sucessivos e restaura o original',asyn
  const openInspect=async()=>{
   await page.getByRole('button',{name:'Inspecionar',exact:false}).click();
   await title.click();
-  await expect(page.getByText('Selecionado',{exact:true})).toBeVisible();
+  await expect(page.getByRole('spinbutton',{name:'Tamanho do texto (px)',exact:true})).toBeVisible();
  };
  await openInspect();
  await expect(page.getByText('Layout',{exact:true})).toHaveCount(0);
@@ -231,8 +231,8 @@ test('edita visualmente, preserva ajustes sucessivos e restaura o original',asyn
  await openInspect();
  await page.getByRole('button',{name:'Restaurar original',exact:true}).click();
  await expect.poll(async()=>await readFile(htmlPath,'utf8')).toBe(original);
- await expect.poll(async()=>title.evaluate(element=>getComputedStyle(element).fontSize)).toBe('13px');
- await expect.poll(async()=>title.evaluate(element=>getComputedStyle(element).paddingTop)).toBe('0px');
+ await expect.poll(async()=>{ try { return await title.evaluate(element=>getComputedStyle(element).fontSize); } catch { return ''; } }).toBe('13px');
+ await expect.poll(async()=>{ try { return await title.evaluate(element=>getComputedStyle(element).paddingTop); } catch { return ''; } }).toBe('0px');
 });
 
 test('cria conexão rotulada e navega no minimapa',async({page})=>{

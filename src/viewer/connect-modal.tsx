@@ -17,10 +17,10 @@ export function connectCommands(folder: string) {
 }
 
 const TABS = [
-  { id: 'claude', label: 'connect.claude', help: 'connect.claudeHelp' },
-  { id: 'cursor', label: 'connect.cursor', help: 'connect.cursorHelp' },
-  { id: 'codex', label: 'connect.codex', help: 'connect.codexHelp' },
-  { id: 'manual', label: 'connect.manual', help: 'connect.manualHelp' },
+  { id: 'claude', label: 'connect.claude' },
+  { id: 'cursor', label: 'connect.cursor' },
+  { id: 'codex', label: 'connect.codex' },
+  { id: 'manual', label: 'connect.manual' },
 ] as const;
 
 export function ConnectModal() {
@@ -30,12 +30,11 @@ export function ConnectModal() {
   const [copied, setCopied] = useState(false);
   if (!open || !folder) return null;
   const command = connectCommands(folder)[tab];
-  const current = TABS.find(item => item.id === tab) ?? TABS[0];
   const copy = () => { void navigator.clipboard?.writeText(command).then(() => setCopied(true)).catch(() => setCopied(false)); };
   return <div className="scrim" onClick={() => update({ connectOpen: false })}><section role="dialog" aria-modal="true" aria-label={t('connect.title')} className="info-sheet connect-sheet" onClick={event => event.stopPropagation()}>
     <button className="close" aria-label={t('connect.close')} onClick={() => update({ connectOpen: false })}><X /></button>
     <h1>{t('connect.title')}</h1>
     <div className="connect-tabs" role="tablist" aria-label={t('connect.title')}>{TABS.map(item => <button key={item.id} role="tab" aria-selected={tab === item.id} onClick={() => { setTab(item.id); setCopied(false); }}>{t(item.label as MessageKey)}</button>)}</div>
-    <div role="tabpanel"><p>{t(current.help)}</p><pre className="connect-command">{command}</pre><button type="button" className="primary" onClick={copy}>{copied ? t('connect.copied') : t('connect.copy')}</button></div>
+    <div role="tabpanel"><pre className="connect-command">{command}</pre><button type="button" className="primary" onClick={copy}>{copied ? t('connect.copied') : t('connect.copy')}</button></div>
   </section></div>;
 }

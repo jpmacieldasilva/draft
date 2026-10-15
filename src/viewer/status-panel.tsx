@@ -1,4 +1,4 @@
-import { type FormEvent } from 'react';
+import { useEffect, useRef, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { frameActivity, type Frame, type FrameActivity, type Workspace } from '../protocol';
 import { t } from '../i18n';
@@ -21,16 +21,17 @@ function FrameDecisions({ frame, workspace }: { frame: Frame; workspace: Workspa
   const summary = workspace.summaries?.find(item => item.frameId === frame.id);
   const questions = (workspace.questions ?? []).filter(item => item.frameId === frame.id && item.status === 'open');
   const comments = workspace.feedback.filter(item => item.frameId === frame.id && item.status === 'open');
-  return <div className="status-frame">
+  const node = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (snapshot().selected === frame.id) node.current?.scrollIntoView({ block: 'nearest' }); }, [frame.id, workspace.revision]);
+  return <div className="status-frame" ref={node}>
     <strong>{frame.title}</strong>
     {questions.map(question => <form key={question.id} className="status-question" onSubmit={event => answerQuestion(event, frame.id, question.id)}>
-      <span className="muted">{t('status.question')}</span>
       <p>{question.prompt}</p>
       <label>{t('status.answer')}<textarea name="answer" required maxLength={4000} placeholder={t('status.answerPlaceholder')} /></label>
       <button className="primary" type="submit" disabled={snapshot().busy}>{t('status.sendAnswer')}</button>
     </form>)}
-    {comments.map(comment => <button key={comment.id} className="status-comment" onClick={() => update({ comments: true, selected: frame.id, feedback: comment.id, inspector: false })}><span className="muted">{t('status.comment')}</span>{comment.message}</button>)}
-    {summary && <div className="status-summary"><span className="muted">{t('status.summary')}</span><p>{summary.text}</p>
+    {comments.map(comment => <button key={comment.id} className="status-comment" onClick={() => update({ comments: true, selected: frame.id, feedback: comment.id, inspector: false })}>{comment.message}</button>)}
+    {summary && <div className="status-summary"><p>{summary.text}</p>
       {!!summary.assumptions.length && <ul className="assumptions">{summary.assumptions.map(assumption => <li key={assumption.id}><p>{assumption.text}</p><span className={`assumption-${assumption.status}`}>{assumption.status === 'pending' ? t('status.assumptions') : assumption.status === 'accepted' ? t('status.accept') : t('status.reject')}</span>
         {assumption.status === 'pending' && !workspace.readOnly && <span className="assumption-actions"><button type="button" onClick={() => void mutate(`frames/${encodeURIComponent(frame.id)}/assumptions/${encodeURIComponent(assumption.id)}`, { status: 'accepted' })}>{t('status.accept')}</button><button type="button" onClick={() => void mutate(`frames/${encodeURIComponent(frame.id)}/assumptions/${encodeURIComponent(assumption.id)}`, { status: 'rejected' })}>{t('status.reject')}</button></span>}
       </li>)}</ul>}
