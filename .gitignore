@@ -7,6 +7,8 @@ docs/*
 docs/ui/*
 !docs/ui/layer-1/
 !docs/ui/layer-1/**
+!docs/ui/layer-2/
+!docs/ui/layer-2/**
 *.tgz
 test-results/
 playwright-report/

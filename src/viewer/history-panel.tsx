@@ -46,7 +46,6 @@ export function HistoryPanel() {
   const close = () => update({ historyFrame: undefined });
   return <div className="scrim" onClick={close}><section role="dialog" aria-modal="true" aria-label={t('history.title')} className="info-sheet history-sheet" onClick={event => event.stopPropagation()}>
     <button className="close" aria-label={t('history.close')} onClick={close}><X /></button>
-    <p className="muted">{frame.title}</p>
     <h1>{t('history.title')}</h1>
     {loading && <p role="status">{t('history.loading')}</p>}
     {!loading && !available && <p role="status">{t('history.unavailable')}</p>}

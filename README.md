@@ -32,17 +32,17 @@ Opens the included lista study (`examples/lista`). Copy that folder when you sta
 
 ![Comments — pins and region notes next to the prototype](media/feedback.png)
 
-- **Compare** — live HTML alternatives on a local canvas (flow, minimap, viewport presets). When a group has a control and a variant, **Comparar** shows them side by side; each pane repeats the role and the decision (hypothesis and criteria).
+- **Compare** — live HTML alternatives on a local canvas (flow, minimap, viewport presets). A control or variant shows as a plain chip, **Controle** or **Variante**, with no separate compare view.
 - **Inspect** — try type, color, fill, border, padding and gap on the live frame. The preview is temporary. The bar shows **Não salvo**, **Reset** (drops the preview) and **Salvar** (accessible name **Salvar ajuste**), which writes the change into that frame's HTML and never into a stylesheet shared with other frames. Setting a border width also sets a solid border when the current style is missing or `none`; setting gap sets `display: flex` unless the element is already flex or grid. **Restaurar original** writes the file back byte for byte when it still holds exactly what Draft last wrote and no other saved tweak touches that file; otherwise it removes only the declarations Draft wrote, so a later edit in the same file survives. An active agent claim blocks Inspect: the panel locks and the save returns 409.
-- **Status** — the frame badge is derived. An open comment or an unanswered agent question shows **Precisa de você**. Otherwise an active claim shows **Em andamento**. Otherwise a submitted summary shows **Pronto**. With none of those, there is no activity badge. **Status** answers questions and accepts or rejects each assumption. Rejecting one opens a comment on the frame; accepting does not.
+- **Status** — the frame header shows a focusable state dot named in its tooltip. Idle (**Em espera**) and **Pronto** are a plain 6px grey dot. An agent at work is a plain 6px accent dot. **Precisa de você** is an 8px terracotta dot with a 2px ring of the same color, 2px outside the dot. Any state dot opens the side panel, which answers questions and accepts or rejects each assumption. Rejecting one opens a comment on the frame; accepting does not.
 - **History** — in a Git repository, the frame menu lists commits that touch `frames/<id>/`, shows the diff, and can restore that version as a new commit `draft(<id>): restaurar <sha>`. Without Git, the top bar shows **Sem Git** and history says it is unavailable; the canvas keeps working.
 - **Código** — switches that frame to a read-only view of its HTML. **Prévia** returns to the live iframe.
-- **Conectar agente** — copies a stdio MCP command for Claude Code, Cursor, Codex, or a manual client, already pointed at this workspace folder. Read-only export bundles omit that absolute path.
+- **Conectar agente** — copies a stdio command already pointed at this workspace folder. The button sits in the top bar only while no agent is connected; after that, the same dialog lives under **Configurações**. Read-only export bundles omit that absolute path.
 - **Comment** — pin a point or drag a region next to the pixels.
 - **Present the flow** — in presentation mode, arrow keys follow `edges` (← goes back), the bar lists the next steps, and any element with `data-draft-goto="<frameId>"` inside a prototype jumps to that frame. On the canvas the same link selects and centers the target.
 - **Share** — same folder via Git or zip; `draft export` builds a read-only bundle with the flow and the comments (add `--no-feedback` to leave comments out).
 
-Local state (canvas layout, comments, presence, undo baselines) lives in `.draft/`. Folders from older versions with `.draftroom/` are migrated on open. Questions (`frames/<id>/questions.json`), summaries (`frames/<id>/summary.json`) and an optional `research.md` at the workspace root travel with the folder. `research.md` is shown on the canvas and included in `draft context`; above 100,000 characters it is omitted and a notice is shown.
+Local state (canvas layout, comments, presence, undo baselines) lives in `.draft/`. Folders from older versions with `.draftroom/` are migrated on open. Questions (`frames/<id>/questions.json`), summaries (`frames/<id>/summary.json`) and an optional `research.md` at the workspace root travel with the folder. `research.md` is included in `draft context`; above 100,000 characters it is omitted and a notice is shown. Showing those notes as documents on the canvas is a follow-up.
 
 Frame HTML/CSS under `frames/` is what you ship and hand off. Edit those files (or verify them after Inspect) when you need something to survive reload.
 
@@ -93,8 +93,8 @@ Everything that matters for the study lives in the manifest, so it travels with 
 }
 ```
 
-- `state` — any short name (empty, loading, error, success…). Shown as a badge on the frame.
-- `role` — `control` or `variant`, per `group`. When a group has a control and a variant, **Comparar** shows them side by side. The header and each pane show the decision hypothesis and criteria.
+- `state` — any short name (empty, loading, error, success…). Listed in the status side panel.
+- `role` — `control` or `variant`, per `group`. The viewer shows that as a plain **Controle** or **Variante** chip.
 - `edges` — the flow drawn on the canvas. Connections you draw in the viewer are saved here. Older folders that kept them in `.draft/layout.json` are migrated on open.
 - `draft create <folder> "Title" --flow` starts with empty → loading → success / error states already linked.
 - Manifests without `schemaVersion` still open unchanged; the first write from Draft adds `schemaVersion: 2`. Fields Draft does not know are preserved.

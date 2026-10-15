@@ -23,6 +23,7 @@ test('preserva interação entre canvas, apresentação e retorno',async({page})
  const row=frame.locator('.row',{hasText:'Responder o e-mail do contador'});
  await row.click();
  await expect(row).toHaveClass(/done/);
+ await page.getByRole('button',{name:'Base clara',exact:true}).click();
  await page.getByRole('button',{name:'Apresentar Base clara',exact:true}).click();
  await expect(page).toHaveURL(/#frame\/base$/);
  await expect(row).toHaveClass(/done/);
@@ -31,9 +32,8 @@ test('preserva interação entre canvas, apresentação e retorno',async({page})
  await page.getByRole('button',{name:/Canvas/}).click();
  await expect.poll(()=>page.evaluate(()=>Boolean(document.fullscreenElement))).toBe(false);
  await expect(row).toHaveClass(/done/);
- await page.getByRole('button',{name:'Lista que entende o que você escreve',exact:false}).click();
- await expect(page.getByRole('dialog')).toContainText('Um app de lista minimalista');
- await page.getByRole('button',{name:'Fechar informações'}).click();
+ await expect(page.locator('.workspace-title')).toHaveText('Lista que entende o que você escreve');
+ await expect(page.getByRole('button',{name:/Informações/})).toHaveCount(0);
 });
 
 test('abre inspector ao selecionar elemento sem misturar comentários',async({page})=>{
@@ -50,7 +50,7 @@ test('persiste comentário de região, resolve e reabre na pasta',async({page})=
  await page.getByRole('button',{name:'Base clara',exact:true}).click();
  await page.getByRole('button',{name:'Centralizar frames',exact:true}).click();
  await page.getByRole('button',{name:'Comentar',exact:false}).click();
- await expect(page.getByText(/Arraste no protótipo para marcar uma região/)).toBeVisible();
+ await expect(page.getByRole('button',{name:'Comentar',exact:false})).toHaveAttribute('aria-pressed','true');
  const iframe=page.locator('iframe[title="Base clara"]');
  await expect.poll(async()=>{
   const region=await iframe.boundingBox();
@@ -59,14 +59,19 @@ test('persiste comentário de região, resolve e reabre na pasta',async({page})=
   await page.mouse.down();
   await page.mouse.move(region.x+region.width-50,region.y+region.height-60,{steps:15});
   await page.mouse.up();
-  return page.getByText('Região selecionada').isVisible();
+  return page.getByRole('textbox',{name:'O que precisa mudar?'}).isVisible();
  },{timeout:15_000}).toBe(true);
  await page.getByRole('textbox',{name:'O que precisa mudar?'}).fill('Dar mais espaço ao título.');
  await page.getByRole('button',{name:'Salvar comentário'}).click();
  await expect(page.getByRole('button',{name:'Resolver',exact:true})).toBeVisible();
  await page.reload();
- await page.getByRole('button',{name:/^Comentários/}).click();
- await expect(page.getByText('Dar mais espaço ao título.',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Configurações',exact:true}).click();
+ await page.getByRole('menuitem',{name:/^Comentários/}).click();
+ await expect(page.locator('.comments-panel textarea')).toHaveCount(0);
+ await page.locator('.comment-list .comment',{hasText:'Dar mais espaço ao título.'}).click();
+ const popover=page.getByRole('dialog',{name:'Comentário'});
+ await expect(popover).toContainText('Você');
+ await expect(popover).toContainText('Dar mais espaço ao título.');
  await page.getByRole('button',{name:'Resolver',exact:true}).click();
  await expect(page.getByRole('button',{name:'Reabrir',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Reabrir',exact:true}).click();
@@ -88,6 +93,7 @@ test('recarrega apenas o frame alterado e preserva outro formulário',async({pag
 
 test('duplica e oculta uma alternativa sem apagar a fonte',async({page})=>{
  await page.goto(url);
+ await page.getByRole('button',{name:'Base clara',exact:true}).click();
  await page.getByLabel('Opções de Base clara').click();
  await page.getByRole('button',{name:'Duplicar alternativa',exact:true}).first().click();
  await expect(page.locator('iframe')).toHaveCount(5);
@@ -132,7 +138,7 @@ test('marca região e persiste comentário',async({page})=>{
  await page.getByRole('button',{name:'Base clara',exact:true}).click();
  await page.getByRole('button',{name:'Centralizar frames',exact:true}).click();
  await page.getByRole('button',{name:'Comentar',exact:false}).click();
- await expect(page.getByText(/Arraste no protótipo para marcar uma região/)).toBeVisible();
+ await expect(page.getByRole('button',{name:'Comentar',exact:false})).toHaveAttribute('aria-pressed','true');
  const iframe=page.locator('iframe[title="Base clara"]');
  await expect.poll(async()=>{
   const region=await iframe.boundingBox();
@@ -141,7 +147,7 @@ test('marca região e persiste comentário',async({page})=>{
   await page.mouse.down();
   await page.mouse.move(region.x+region.width-50,region.y+region.height-60,{steps:15});
   await page.mouse.up();
-  return page.getByText('Região selecionada').isVisible();
+  return page.getByRole('textbox',{name:'O que precisa mudar?'}).isVisible();
  },{timeout:15_000}).toBe(true);
  await expect(page.getByRole('textbox',{name:'O que precisa mudar?'})).toBeVisible();
  await page.getByRole('textbox',{name:'O que precisa mudar?'}).fill('Rever o espaço desta região.');
@@ -173,6 +179,7 @@ test('bundle estático abre em subpasta sem API e preserva interação',async({p
  const address=staticServer.address();if(!address||typeof address==='string')throw new Error('Porta inválida');
  try {
   await page.goto(`http://127.0.0.1:${address.port}/bundle/index.html`);
+  await page.getByRole('button',{name:'Compacta com barra lateral',exact:true}).click();
   await page.getByRole('button',{name:'Apresentar Compacta com barra lateral',exact:true}).click();
   await expect(page.getByRole('button',{name:/Canvas/})).toBeVisible();
   await expect(page.frameLocator('iframe[title="Compacta com barra lateral"]').getByRole('heading',{level:1})).toHaveCSS('font-size','42px');
@@ -207,7 +214,7 @@ test('edita visualmente, preserva ajustes sucessivos e restaura o original',asyn
  const openInspect=async()=>{
   await page.getByRole('button',{name:'Inspecionar',exact:false}).click();
   await title.click();
-  await expect(page.getByText('Selecionado',{exact:true})).toBeVisible();
+  await expect(page.getByRole('spinbutton',{name:'Tamanho do texto (px)',exact:true})).toBeVisible();
  };
  await openInspect();
  await expect(page.getByText('Layout',{exact:true})).toHaveCount(0);
@@ -228,8 +235,8 @@ test('edita visualmente, preserva ajustes sucessivos e restaura o original',asyn
  await openInspect();
  await page.getByRole('button',{name:'Restaurar original',exact:true}).click();
  await expect.poll(async()=>await readFile(htmlPath,'utf8')).toBe(original);
- await expect.poll(async()=>title.evaluate(element=>getComputedStyle(element).fontSize)).toBe('13px');
- await expect.poll(async()=>title.evaluate(element=>getComputedStyle(element).paddingTop)).toBe('0px');
+ await expect.poll(async()=>{ try { return await title.evaluate(element=>getComputedStyle(element).fontSize); } catch { return ''; } }).toBe('13px');
+ await expect.poll(async()=>{ try { return await title.evaluate(element=>getComputedStyle(element).paddingTop); } catch { return ''; } }).toBe('0px');
 });
 
 test('cria conexão rotulada e navega no minimapa',async({page})=>{
@@ -256,6 +263,7 @@ test('altera viewport por preset sem recarregar o protótipo',async({page})=>{
  const frame=page.frameLocator('iframe[title="Base clara"]');
  const row=frame.locator('.row',{hasText:'Responder o e-mail do contador'});
  await row.click();
+ await page.getByRole('button',{name:'Base clara',exact:true}).click();
  await page.getByLabel('Viewport de Base clara', {exact:true}).click();
  await page.getByRole('button',{name:'Tablet',exact:true}).click();
  await expect(page.locator('iframe[title="Base clara"]')).toHaveCSS('width','768px');

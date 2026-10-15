@@ -76,11 +76,16 @@ test('context não expõe arquivos privados', async ({ workspace }) => {
 test('resolve pelo CLI aparece no viewer aberto', async ({ page, studio }) => {
  const ids = await seedComments(studio.url);
  await page.goto(studio.url);
- await page.getByRole('button', { name: /^Comentários/ }).click();
- await expect(page.getByRole('button', { name: /^Comentários/ })).toContainText('2');
+ await page.getByRole('button', { name: 'Configurações', exact: true }).click();
+ await expect(page.getByRole('menuitem', { name: /^Comentários/ })).toContainText('2');
+ await page.getByRole('menuitem', { name: /^Comentários/ }).click();
+ await expect(page.locator('.comments-panel header')).toContainText('2');
  expect((await runCli(['feedback', 'resolve', studio.folder, ids.base])).code).toBe(0);
- await expect(page.getByRole('button', { name: /^Comentários/ })).toContainText('1');
- await expect(page.locator('.comment', { hasText: 'Título maior.' })).toContainText('Resolvido');
+ await expect(page.locator('.comments-panel header')).toContainText('1');
+ await expect(page.locator('.comments-panel .comment', { hasText: 'Título maior.' })).toContainText('Resolvido');
+ await page.locator('.comments-panel .comment', { hasText: 'Título maior.' }).click();
+ await expect(page.getByRole('dialog', { name: 'Comentário' })).toContainText('Você');
+ await expect(page.getByRole('dialog', { name: 'Comentário' })).toContainText('Título maior.');
 });
 
 test('manifesto inválido faz context falhar com a mensagem exata', async ({ workspace }) => {

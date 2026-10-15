@@ -95,5 +95,5 @@ Rede:
 7. Sem `.git` o viewer quebra ou esconde o aviso. (`decisions.spec.ts` — "pasta sem git mostra aviso e o canvas continua")
 8. Inspect com claim ativo grava o HTML do frame. (`decisions.spec.ts` — "claim ativo bloqueia salvar no Inspect")
 9. A vista de código aceita edição, ou `research.md` não entra no contexto. (`decisions.spec.ts` — "código é somente leitura e a nota de pesquisa entra no contexto")
-10. O modal Conectar agente omite um cliente ou o caminho do workspace. (`decisions.spec.ts` — "conectar agente mostra o comando de cada cliente")
-11. Comparar esconde o papel ou a decisão em um dos frames. (`decisions.spec.ts` — "comparar mostra papel e decisão em cada frame")
+10. O modal Conectar agente omite um cliente ou o caminho do workspace, ou o botão da barra de cima continua depois de um agente conectado. (`decisions.spec.ts` — "conectar agente mostra o comando de cada cliente")
+11. O papel vira botão ou abre uma comparação. (`decisions.spec.ts` — "papel é um selo e não abre comparação")

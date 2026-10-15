@@ -59,13 +59,13 @@ export function VisualEditor({frameId,target}:{frameId:string;target:Target}) {
  if(target.kind!=='element')return null;
  if (claim) {
   return <section className="visual-editor agent-locked" aria-label={t('editor.lockedLabel')}>
-   <header className="editor-header"><span className="selection-indicator locked" aria-hidden="true"/><div><span className="editor-eyebrow">{t('frame.agent')}</span><strong>{claim.label}</strong></div></header>
+   <header className="editor-header"><span className="selection-indicator locked" aria-hidden="true"/><div><strong>{claim.label}</strong></div></header>
    <p className="editor-lock" role="status" title={t('frame.agentHere')}>{t('editor.locked')}</p>
   </section>;
  }
  const pending=dirty(state);
  return <section className="visual-editor" aria-label={t('editor.label')}>
-  <header className="editor-header"><span className="selection-indicator" aria-hidden="true"/><div><span className="editor-eyebrow">{t('editor.selected')}</span><strong>{target.label}</strong></div></header>
+  <header className="editor-header"><span className="selection-indicator" aria-hidden="true"/><div><strong>{target.label}</strong></div></header>
   <nav className="editor-breadcrumb" aria-label={t('editor.breadcrumb')}><button type="button" onClick={()=>showCode(frameId,true)}>{entry}</button><span>{target.label}</span></nav>
   <footer className="editor-savebar">{pending&&<span className="editor-unsaved" role="status">{t('editor.unsaved')}</span>}<button type="button" onClick={()=>reset(context)} disabled={!pending}>{t('editor.reset')}</button><button type="button" className="primary" aria-label={t('editor.save')} disabled={snapshot().busy||!!state.error||!pending} onClick={()=>void save(context)}>{t('editor.saveShort')}</button></footer>
   {!state.ready&&<p className="editor-loading" role="status">{t('editor.loading')}</p>}
@@ -80,7 +80,7 @@ export function VisualEditor({frameId,target}:{frameId:string;target:Target}) {
     {Object.entries(COLOR_FIELDS).filter(([name])=>group.names.includes(name)).map(([name,label])=><label key={name}>{t(label)}<input aria-label={t(label)} value={state.changes[name]??state.styles[name]??''} placeholder="#334455" onChange={event=>changeStyle(context,name,event.currentTarget.value)}/></label>)}
     {NUMERIC_FIELDS.filter(([name])=>group.names.includes(name)).map(([name,label])=><label key={name}>{t(label)} (px)<input type="number" min={name==='margin'?-500:0} max={500} step="1" placeholder={t('editor.auto')} aria-label={`${t(label)} (px)`} value={numericValue(state.changes[name]??state.styles[name])} onChange={event=>changeNumber(context,name,event)}/></label>)}
     {Object.entries(SELECT_FIELDS).filter(([name])=>group.names.includes(name)).map(([name,field])=><label key={name}>{t(field.label)}<select value={state.changes[name]??state.styles[name]??''} onChange={event=>changeStyle(context,name,event.currentTarget.value)}>{!field.values.includes(state.styles[name])&&<option value={state.styles[name]??''}>{state.styles[name]??t('editor.default')}</option>}{field.values.map(value=><option key={value} value={value}>{value}</option>)}</select></label>)}
-   </div>{group.names.includes('gap')&&<p className="editor-hint">{t('editor.gapHint')}</p>}</details>)}
+   </div></details>)}
    {state.error&&<p role="alert">{state.error}</p>}
    {state.saved&&<p role="status">{t('editor.saved')}</p>}
    <button type="button" className="restore-original" onClick={()=>void restoreOriginal(context)}>{t('editor.restore')}</button>

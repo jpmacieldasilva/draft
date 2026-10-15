@@ -60,16 +60,16 @@
   bottom: 26px;
   width: 190px;
   z-index: 21;
-  border: 1px solid var(--color-border);
+  border: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
   border-radius: var(--radius-panel);
   padding: var(--space-12);
-  background: color-mix(in srgb, var(--color-surface) 93%, transparent);
+  background: color-mix(in srgb, var(--color-canvas) 72%, transparent);
   box-shadow: var(--shadow-float);
 }
 .minimap > span { font-size: var(--text-12); color: var(--color-text-secondary); }
 .minimap svg { display: block; width: 100%; height: 104px; margin-top: var(--space-8); cursor: crosshair; overflow: hidden; }
-.minimap-frame { fill: var(--color-canvas); stroke: var(--color-border); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.minimap-viewport { fill: color-mix(in srgb, var(--color-accent) 8%, transparent); stroke: var(--color-accent); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.minimap-frame { fill: color-mix(in srgb, var(--color-text) 70%, var(--color-surface)); stroke: var(--color-text); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.minimap-viewport { fill: color-mix(in srgb, var(--color-accent) 24%, transparent); stroke: var(--color-accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .is-presenting .minimap, .is-presenting .connection-panel { display: none; }
 .frame:has(details[open]) { z-index: 15; }
 @media (max-width: 700px) {

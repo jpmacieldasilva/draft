@@ -84,10 +84,12 @@ test('renomear e duplicar preservam decisão, arestas e papéis', async ({ page,
  const viewer = await startViewer(workspace);
  try {
   await page.goto(viewer.url);
+  await page.getByRole('button', { name: 'Launcher escuro', exact: true }).click();
   await page.getByLabel('Opções de Launcher escuro').click();
   await page.getByRole('textbox', { name: 'Novo título' }).fill('Leitura rápida');
   await page.getByRole('button', { name: 'Renomear', exact: true }).click();
   await expect(page.locator('iframe[title="Leitura rápida"]')).toBeVisible();
+  await page.getByRole('button', { name: 'Base clara', exact: true }).click();
   await page.getByLabel('Opções de Base clara').click();
   await page.getByRole('button', { name: 'Duplicar alternativa', exact: true }).first().click();
   await expect(page.locator('iframe')).toHaveCount(5);
@@ -140,46 +142,45 @@ test('selos de estado e papel aparecem no cabeçalho do frame', async ({ page, w
  const viewer = await startViewer(workspace);
  try {
   await page.goto(viewer.url);
-  await expect(page.locator('article[aria-label="Base clara"] .frame-badge')).toHaveText(['ready', 'Controle']);
-  await expect(page.locator('article[aria-label="Compacta com barra lateral"] .frame-badge')).toHaveText(['loading', 'Variante']);
+  const control = page.locator('article[aria-label="Base clara"] [data-testid="frame-role"]');
+  await expect(control).toHaveText('Controle');
+  await expect(control).toHaveCSS('background-color', 'rgb(240, 239, 236)');
+  expect(await control.evaluate(element => element.tagName)).toBe('SPAN');
+  await expect(page.locator('article[aria-label="Compacta com barra lateral"] [data-testid="frame-role"]')).toHaveText('Variante');
+  await expect(page.locator('article [data-testid="frame-state"]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Em espera', exact: true }).first().click();
+  const panel = page.getByRole('complementary', { name: 'Status dos frames' });
+  await expect(panel.getByText('ready', { exact: true }).first()).toBeVisible();
+  await expect(panel.getByText('loading', { exact: true })).toBeVisible();
  } finally { viewer.process.kill('SIGTERM'); }
 });
 
-test('decisão, teste e sinal aparecem no painel de informações', async ({ page, workspace }) => {
+test('não há painel de informações e o papel é um selo', async ({ page, workspace }) => {
  await abTest(workspace);
  const viewer = await startViewer(workspace);
  try {
   await page.goto(viewer.url);
-  await page.getByRole('button', { name: 'Lista que entende o que você escreve', exact: false }).click();
-  const sheet = page.getByRole('dialog', { name: 'Informações' });
-  await expect(sheet.locator('.decision')).toContainText('Hipótese');
-  await expect(sheet.locator('.decision')).toContainText('A barra lateral reduz o tempo para filtrar.');
-  await expect(sheet.locator('.decision')).toContainText('Menos cliques até achar uma compra.');
-  await page.getByRole('button', { name: 'Fechar informações' }).click();
-  await page.getByRole('button', { name: 'Informações de Compacta com barra lateral', exact: true }).click();
-  await expect(sheet.locator('.frame-meta')).toContainText('Barra lateral com contadores.');
-  await expect(sheet.locator('.frame-meta')).toContainText('clicks_to_filter');
+  await expect(page.getByRole('button', { name: /Informações/ })).toHaveCount(0);
+  await expect(page.locator('[data-testid="frame-action-info"]')).toHaveCount(0);
+  const chip = page.locator('article[aria-label="Compacta com barra lateral"] [data-testid="frame-role"]');
+  await expect(chip).toHaveText('Variante');
+  expect(await chip.evaluate(element => element.tagName)).toBe('SPAN');
+  await expect(page.getByRole('dialog', { name: 'Informações' })).toHaveCount(0);
  } finally { viewer.process.kill('SIGTERM'); }
 });
 
-test('comparar mostra controle e variante lado a lado com o critério', async ({ page, workspace }) => {
+test('papel continua um selo depois que o manifesto ganha controle e variante', async ({ page, workspace }) => {
  await writeManifest(workspace, manifest => ({ ...manifest, frames: manifest.frames.map(frame => { const { role: _role, ...rest } = frame; return rest; }) }));
  const viewer = await startViewer(workspace);
  try {
   await page.goto(viewer.url);
-  await expect(page.getByRole('button', { name: 'Comparar', exact: true })).toHaveCount(0);
+  await expect(page.locator('[data-testid="frame-role"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Comparar controle e variante', exact: true })).toHaveCount(0);
   await abTest(workspace);
-  await expect(page.getByRole('button', { name: 'Comparar', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Comparar', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Comparar controle e variante' });
-  await expect(dialog).toContainText('Menos cliques até achar uma compra.');
-  await expect(dialog.locator('iframe[title="Controle: Base clara"]')).toBeVisible();
-  await expect(dialog.locator('iframe[title="Variante: Launcher escuro"]')).toBeVisible();
-  await dialog.getByRole('combobox', { name: 'Variante' }).selectOption('lateral');
-  await expect(dialog.locator('iframe[title="Variante: Compacta com barra lateral"]')).toBeVisible();
-  await expect(dialog).toContainText('Barra lateral com contadores.');
-  await expect(dialog.frameLocator('iframe[title="Variante: Compacta com barra lateral"]').getByRole('heading', { level: 1 })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Fechar comparação' }).click();
-  await expect(dialog).toHaveCount(0);
+  const variant = page.locator('article[aria-label="Launcher escuro"] [data-testid="frame-role"]');
+  await expect(variant).toHaveText('Variante');
+  expect(await variant.evaluate(element => element.tagName)).toBe('SPAN');
+  await expect(page.locator('article[aria-label="Base clara"] [data-testid="frame-role"]')).toHaveText('Controle');
+  await expect(page.getByRole('dialog', { name: 'Comparar controle e variante' })).toHaveCount(0);
  } finally { viewer.process.kill('SIGTERM'); }
 });
