@@ -1,6 +1,6 @@
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
-import type { Feedback, PresenceActor } from '../protocol.js';
+import { frameActivity, type Feedback, type PresenceActor } from '../protocol.js';
 import { translator, type Locale } from '../i18n.js';
 import { WorkspaceStore, confined, discoverExperiment, publicPath } from './workspace.js';
 
@@ -36,7 +36,7 @@ export function feedbackItems(feedback: Feedback[]): FeedbackItem[] {
 
 export function agentRules(folder: string, locale: Locale) {
   const t = translator(locale), quoted = JSON.stringify(folder);
-  return (['rules.claim', 'rules.scope', 'rules.html', 'rules.ids', 'rules.resolve', 'rules.state', 'rules.manifest'] as const).map(key => t(key, { folder: quoted }));
+  return (['rules.claim', 'rules.scope', 'rules.html', 'rules.ids', 'rules.resolve', 'rules.state', 'rules.manifest', 'rules.ask', 'rules.summary'] as const).map(key => t(key, { folder: quoted }));
 }
 
 export async function buildContext(store: WorkspaceStore) {
@@ -54,6 +54,7 @@ export async function buildContext(store: WorkspaceStore) {
       files: await frameFiles(store.root, frame.entry),
       openFeedback: open.filter(item => item.frameId === frame.id).length,
       ...(claim ? { claimedBy: claim.label, claimExpiresAt: claim.expiresAt } : {}),
+      ...(frameActivity(frame.id, workspace) ? { activity: frameActivity(frame.id, workspace) } : {}),
     };
   }));
   return {
@@ -63,6 +64,9 @@ export async function buildContext(store: WorkspaceStore) {
     frames,
     edges: workspace.experiment.edges,
     feedback: feedbackItems(open),
+    questions: workspace.questions ?? [],
+    summaries: workspace.summaries ?? [],
+    ...(workspace.research ? { research: workspace.research } : {}),
     presence,
     diagnostics: workspace.diagnostics,
     ...(workspace.experiment.allowNetwork ? { allowNetwork: workspace.experiment.allowNetwork } : {}),

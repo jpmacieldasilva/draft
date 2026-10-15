@@ -71,7 +71,7 @@ try {
       const { actor } = await store.claim({ id: flags.id, label: flags.label, frameId: frameId || undefined, ttlSeconds: flags.ttl ? Number(flags.ttl) : undefined });
       print(actor);
     } else if (sub === 'clear') {
-      print(await store.clearPresence(flags.id ? { id: flags.id } : (frameId !== undefined ? { frameId } : undefined)));
+      print(await store.release(flags.id ? { id: flags.id } : (frameId !== undefined ? { frameId } : undefined)));
     } else if (sub === 'list') {
       print(await store.loadPresence());
     } else throw new Error(USAGE);

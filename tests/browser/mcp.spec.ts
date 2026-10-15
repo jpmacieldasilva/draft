@@ -26,7 +26,7 @@ test('servidor MCP lista as ferramentas do Draft', async ({ workspace }) => {
  const mcp = await connect(workspace);
  try {
   const { tools } = await mcp.client.listTools();
-  expect(tools.map(tool => tool.name).sort()).toEqual(['claim', 'get_context', 'get_selection', 'list_frames', 'read_frame', 'release', 'resolve_feedback', 'update_manifest', 'write_frame']);
+  expect(tools.map(tool => tool.name).sort()).toEqual(['ask_user', 'claim', 'get_context', 'get_selection', 'list_frames', 'read_frame', 'release', 'resolve_feedback', 'submit_summary', 'update_manifest', 'write_frame']);
   const frames = (await mcp.call<Array<{ id: string }>>('list_frames')).json();
   expect(frames.map(frame => frame.id)).toEqual(['editorial', 'compact', 'focus']);
   const context = (await mcp.call<{ rules: string[]; feedback: unknown[] }>('get_context')).json();

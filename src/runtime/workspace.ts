@@ -1,10 +1,12 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { readFile, realpath, mkdir, writeFile, rename, appendFile, cp, access, lstat, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import { SCHEMA_VERSION, type Experiment, type Frame, type Feedback, type Layout, type Target, type Workspace, type VisualEdit, type Connection, type PresenceActor, type PresenceState } from '../protocol.js';
+import { SCHEMA_VERSION, type AgentQuestion, type Experiment, type Frame, type FrameSummary, type Feedback, type Layout, type Target, type Workspace, type VisualEdit, type Connection, type PresenceActor, type PresenceState } from '../protocol.js';
 import { parseExperiment, serializeManifest, validateEdges } from './manifest.js';
-import { DEFAULT_LOCALE, normalizeLocale, type Locale } from '../i18n.js';
-import { applyEdit, isBaseline, mergeBaseline, revertBaseline, stylesheetsOf, type EditBaseline } from './prototype-writer.js';
+import { DEFAULT_LOCALE, normalizeLocale, translator, type Locale } from '../i18n.js';
+import { applyEdit, isBaseline, mergeBaseline, revertBaseline, stylesheetsOf, writeConfinedText, type EditBaseline } from './prototype-writer.js';
+import { frameFolder, parseQuestions, parseSummary, questionsDocument, summaryDocument } from './decisions.js';
+import { commitFrame, commitMessage, commitPaths, frameLog, framePatch, gitAvailable, restoreFrame } from './git.js';
 
 export class RequestError extends Error { constructor(message: string, public status = 400) { super(message); } }
 export function record(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
@@ -146,7 +148,7 @@ function validateLayout(value: unknown): Layout {
   }
   return { frames, zoom: value.zoom, x: value.x, y: value.y, connections };
 }
-const EDIT_PROPERTIES=new Set(['color','backgroundColor','fontSize','fontWeight','lineHeight','letterSpacing','padding','margin','gap','borderRadius','width','height','display','textAlign','alignItems','justifyContent']);
+const EDIT_PROPERTIES=new Set(['color','backgroundColor','fontSize','fontWeight','lineHeight','letterSpacing','padding','margin','gap','borderRadius','borderWidth','borderColor','borderStyle','width','height','display','textAlign','alignItems','justifyContent']);
 function validateEdit(value:unknown):VisualEdit {
   if(!record(value)||typeof value.frameId!=='string'||typeof value.selector!=='string'||!value.selector.trim()||value.selector.length>2000||!record(value.styles))throw new RequestError('Ajuste inválido.');
   const styles:Record<string,string>={};
@@ -246,7 +248,30 @@ export class WorkspaceStore {
       try { const event: unknown = JSON.parse(line); if (record(event) && typeof event.id === 'string' && typeof event.frameId === 'string' && typeof event.message === 'string' && typeof event.createdAt === 'string' && typeof event.eventId === 'string') feedback.set(event.id, { event: event.event === 'resolved' ? 'resolved' : event.event === 'reopened' ? 'reopened' : 'created', id: event.id, eventId: event.eventId, frameId: event.frameId, message: event.message, createdAt: event.createdAt, status: event.status === 'resolved' ? 'resolved' : 'open', target: validateTarget(event.target) }); } catch { diagnostics.push('Uma linha inválida de feedback foi ignorada.'); }
     }
     const presence = (await this.loadPresence()).actors;
-    return { experiment, readme: await optionalText(this.root, 'README.md'), feedback: [...feedback.values()], layout, revision: createHash('sha256').update(layoutText).digest('hex'), token: this.token, readOnly: false, diagnostics, presence, locale: resolveLocale(experiment.locale) };
+    const questions: AgentQuestion[] = [];
+    const summaries: FrameSummary[] = [];
+    for (const frame of experiment.frames) {
+      const folder = frameFolder(frame.entry);
+      if (!folder) continue;
+      const questionText = await this.readFrameDocument(`${folder}/questions.json`, diagnostics);
+      if (questionText !== undefined) {
+        const parsed = parseQuestions(frame.id, questionText);
+        if (!parsed) diagnostics.push(`Perguntas inválidas em ${folder}/questions.json.`);
+        else questions.push(...parsed);
+      }
+      const summaryText = await this.readFrameDocument(`${folder}/summary.json`, diagnostics);
+      if (summaryText !== undefined) {
+        const parsed = parseSummary(frame.id, summaryText);
+        if (!parsed) diagnostics.push(`Resumo inválido em ${folder}/summary.json.`);
+        else summaries.push(parsed);
+      }
+    }
+    let research = '';
+    try { research = await readFile(await confined(this.root, 'research.md'), 'utf8'); } catch { research = ''; }
+    if (research.length > 100_000) { diagnostics.push('research.md é grande demais e foi omitido.'); research = ''; }
+    let git = false;
+    try { git = await gitAvailable(this.root); } catch { git = false; }
+    return { experiment, readme: await optionalText(this.root, 'README.md'), feedback: [...feedback.values()], layout, revision: createHash('sha256').update(layoutText).digest('hex'), token: this.token, readOnly: false, diagnostics, presence, locale: resolveLocale(experiment.locale), questions, summaries, ...(research ? { research } : {}), git, folder: this.root };
   }
   private async stateDirectory() { const directory = path.join(this.root, STATE_DIR); await mkdir(directory, { recursive: true }); if ((await lstat(directory)).isSymbolicLink()) throw new RequestError('A pasta de estado não pode ser um symlink.', 403); return confined(this.root, STATE_DIR); }
   private async atomic(relative: string, value: unknown) { const directory = await confined(this.root, path.dirname(relative)); const destination = path.join(directory, path.basename(relative)); try { await confined(this.root, relative); } catch (error) { if (error instanceof RequestError) throw error; } const temporary = `${destination}.${randomUUID()}.tmp`; await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { flag: 'wx' }); await rename(temporary, destination); }
@@ -308,17 +333,29 @@ export class WorkspaceStore {
     const edit=validateEdit({...body,styles:body.styles??{}});
     const key=this.baselineKey(edit.frameId,edit.selector);
     const baselines=await this.loadBaselines();
+    const touched=new Set<string>();
     if(body.remove===true){
       const baseline=baselines[key];
       if(!baseline)throw new RequestError('Nenhum ajuste salvo para restaurar.',404);
+      const byteRestore: Record<string, string> = {};
+      const others = Object.entries(baselines).filter(([other]) => other !== key).map(([, value]) => value);
+      for (const [file, snap] of Object.entries(baseline.files ?? {})) {
+        if (others.some(other => other.files?.[file] || other.writes.some(write => write.file === file))) continue;
+        try { if (await readFile(await confined(this.root, file), 'utf8') === snap.written) byteRestore[file] = snap.original; } catch { /* surgical restore keeps later edits */ }
+      }
       await revertBaseline(this.root,frame,baseline);
+      for (const [file, original] of Object.entries(byteRestore)) await writeConfinedText(this.root, file, original);
+      for (const file of baseline.writes.map(write => write.file)) touched.add(file);
+      for (const file of Object.keys(byteRestore)) touched.add(file);
       delete baselines[key];
       await this.saveBaselines(baselines);
-      return;
+    } else {
+      const applied=await applyEdit(this.root,frame,edit,await this.sharedSheets(workspace.experiment,frame.id));
+      baselines[key]=mergeBaseline(edit.frameId,edit.selector,baselines[key],applied);
+      await this.saveBaselines(baselines);
+      for (const file of Object.keys(applied.files)) touched.add(file);
     }
-    const applied=await applyEdit(this.root,frame,edit,await this.sharedSheets(workspace.experiment,frame.id));
-    baselines[key]=mergeBaseline(edit.frameId,edit.selector,baselines[key],applied);
-    await this.saveBaselines(baselines);
+    await commitPaths(this.root, [...touched], commitMessage(frame.id, body.remove === true ? 'restaurar original' : 'salvar ajuste'));
   });}
   feedback(body: Record<string, unknown>, id?: string) { return this.mutate(async () => {
     await this.migrateState();
@@ -327,8 +364,53 @@ export class WorkspaceStore {
     if (id && !['open', 'resolved'].includes(String(body.status))) throw new RequestError('Estado inválido.');
     if (!previous && (typeof body.frameId !== 'string' || !workspace.experiment.frames.some(frame => frame.id === body.frameId) || typeof body.message !== 'string' || !body.message.trim() || body.message.length > 10000)) throw new RequestError('Comentário inválido.');
     const event: Feedback = previous ? { ...previous, status: body.status === 'resolved' ? 'resolved' : 'open', event: body.status === 'resolved' ? 'resolved' : 'reopened', eventId: randomUUID() } : { id: randomUUID(), eventId: randomUUID(), event: 'created', status: 'open', frameId: String(body.frameId), message: String(body.message).trim(), target: validateTarget(body.target), createdAt: new Date().toISOString() };
-    const directory = await this.stateDirectory(); try { await confined(this.root, `${STATE_DIR}/feedback.jsonl`); if ((await lstat(path.join(directory, 'feedback.jsonl'))).isSymbolicLink()) throw new RequestError('O arquivo de feedback não pode ser um symlink.', 403); } catch (error) { if (error instanceof RequestError) throw error; } await appendFile(path.join(directory, 'feedback.jsonl'), `${JSON.stringify(event)}\n`);
+    await this.recordFeedback(event);
   }); }
+  private async recordFeedback(event: Feedback) {
+    const directory = await this.stateDirectory();
+    try { await confined(this.root, `${STATE_DIR}/feedback.jsonl`); if ((await lstat(path.join(directory, 'feedback.jsonl'))).isSymbolicLink()) throw new RequestError('O arquivo de feedback não pode ser um symlink.', 403); } catch (error) { if (error instanceof RequestError) throw error; }
+    await appendFile(path.join(directory, 'feedback.jsonl'), `${JSON.stringify(event)}\n`);
+  }
+  private async readFrameDocument(relative: string, diagnostics: string[]): Promise<string | undefined> {
+    try { return await readFile(await confined(this.root, relative), 'utf8'); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+      diagnostics.push(`Não foi possível ler ${relative}.`);
+      return undefined;
+    }
+  }
+  private async requireFrame(frameId: string): Promise<Frame> {
+    if (!/^[a-zA-Z0-9_-]+$/.test(frameId)) throw new RequestError('Frame inválido.');
+    const frame = (await discoverExperiment(this.root)).experiment.frames.find(candidate => candidate.id === frameId);
+    if (!frame) throw new RequestError(`Frame não encontrado: ${frameId}.`, 404);
+    if (!frameFolder(frame.entry)) throw new RequestError(`O frame ${frameId} precisa ter uma pasta própria em frames/<id>/.`);
+    return frame;
+  }
+  private async readQuestions(frame: Frame): Promise<AgentQuestion[]> {
+    const folder = frameFolder(frame.entry)!;
+    let raw = '';
+    try { raw = await readFile(await confined(this.root, `${folder}/questions.json`), 'utf8'); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []; throw error; }
+    const parsed = parseQuestions(frame.id, raw);
+    if (!parsed) throw new RequestError('Arquivo de perguntas inválido.');
+    return parsed;
+  }
+  private async readSummary(frame: Frame): Promise<FrameSummary | null> {
+    const folder = frameFolder(frame.entry)!;
+    let raw = '';
+    try { raw = await readFile(await confined(this.root, `${folder}/summary.json`), 'utf8'); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error; }
+    const parsed = parseSummary(frame.id, raw);
+    if (!parsed) throw new RequestError('Arquivo de resumo inválido.');
+    return parsed;
+  }
+  private async summaryLead(frameId: string) {
+    try {
+      const frame = (await discoverExperiment(this.root)).experiment.frames.find(candidate => candidate.id === frameId);
+      if (!frame || !frameFolder(frame.entry)) return '';
+      return (await this.readSummary(frame))?.text.split('\n')[0] ?? '';
+    } catch { return ''; }
+  }
   changeFrame(id: string, action: string, body: Record<string, unknown>) { return this.mutate(async () => {
     const { raw, experiment } = await this.readManifest(); const renamed: Record<string, string> = {}; const frame = experiment.frames.find(frame => frame.id === id); if (!frame) throw new RequestError('Frame não encontrado.', 404);
     if (action === 'rename') { if (typeof body.title !== 'string' || !body.title.trim() || body.title.length > 200) throw new RequestError('Título inválido.'); frame.title = body.title.trim(); }
@@ -472,6 +554,83 @@ export class WorkspaceStore {
   }
   async pruneExpired(): Promise<PresenceState> {
     return this.mutatePresence((current) => current);
+  }
+  askUser(frameId: string, prompt: string, askedBy: string) { return this.mutate(async () => {
+    const frame = await this.requireFrame(frameId);
+    if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 2000) throw new RequestError('Pergunta inválida.');
+    const questions = await this.readQuestions(frame);
+    questions.push({ id: randomUUID(), frameId: frame.id, prompt: prompt.trim(), askedAt: new Date().toISOString(), askedBy: askedBy.trim().slice(0, 80) || 'Agent', status: 'open' });
+    await this.atomic(`${frameFolder(frame.entry)}/questions.json`, questionsDocument(questions));
+  }); }
+  answerQuestion(frameId: string, questionId: string, answer: string) { return this.mutate(async () => {
+    const frame = await this.requireFrame(frameId);
+    if (typeof answer !== 'string' || !answer.trim() || answer.length > 4000) throw new RequestError('Resposta inválida.');
+    const questions = await this.readQuestions(frame);
+    const question = questions.find(item => item.id === questionId);
+    if (!question) throw new RequestError('Pergunta não encontrada.', 404);
+    if (question.status === 'answered') throw new RequestError('Essa pergunta já foi respondida.');
+    question.answer = answer.trim();
+    question.answeredAt = new Date().toISOString();
+    question.status = 'answered';
+    await this.atomic(`${frameFolder(frame.entry)}/questions.json`, questionsDocument(questions));
+  }); }
+  submitSummary(frameId: string, text: string, assumptions: unknown, actor: string) { return this.mutate(async () => {
+    const frame = await this.requireFrame(frameId);
+    if (typeof text !== 'string' || !text.trim() || text.length > 8000) throw new RequestError('Resumo inválido.');
+    if (!Array.isArray(assumptions) || assumptions.length > 30 || assumptions.some(item => typeof item !== 'string' || !item.trim() || item.length > 500)) throw new RequestError('Suposições inválidas.');
+    const summary: FrameSummary = { frameId: frame.id, text: text.trim(), submittedAt: new Date().toISOString(), actor: actor.trim().slice(0, 80) || 'Agent', assumptions: assumptions.map(item => ({ id: randomUUID(), text: item.trim(), status: 'pending' as const })) };
+    await this.atomic(`${frameFolder(frame.entry)}/summary.json`, summaryDocument(summary));
+  }); }
+  decideAssumption(frameId: string, assumptionId: string, status: string) { return this.mutate(async () => {
+    const frame = await this.requireFrame(frameId);
+    if (status !== 'accepted' && status !== 'rejected') throw new RequestError('Decisão inválida.');
+    const summary = await this.readSummary(frame);
+    if (!summary) throw new RequestError('Este frame não tem resumo.', 404);
+    const assumption = summary.assumptions.find(item => item.id === assumptionId);
+    if (!assumption) throw new RequestError('Suposição não encontrada.', 404);
+    if (assumption.status !== 'pending') throw new RequestError('Essa suposição já foi decidida.');
+    assumption.status = status;
+    await this.atomic(`${frameFolder(frame.entry)}/summary.json`, summaryDocument(summary));
+    if (status === 'rejected') {
+      const locale = resolveLocale((await this.readManifest()).experiment.locale);
+      await this.recordFeedback({ id: randomUUID(), eventId: randomUUID(), event: 'created', status: 'open', frameId: frame.id, message: translator(locale)('assumption.rejectedComment', { text: assumption.text }).slice(0, 10000), createdAt: new Date().toISOString(), target: { kind: 'region', label: assumption.text.slice(0, 180), rect: { x: 16, y: 16, width: 160, height: 48 } } });
+    }
+  }); }
+  async frameSource(frameId: string) {
+    const frame = await this.requireFrame(frameId);
+    return { path: frame.entry.replace(/\\/g, '/'), content: await readFile(await confined(this.root, frame.entry), 'utf8') };
+  }
+  async frameHistory(frameId: string) {
+    await this.requireFrame(frameId);
+    const commits = await frameLog(this.root, frameId);
+    return commits === null ? { available: false, commits: [] } : { available: true, commits };
+  }
+  async frameDiff(frameId: string, sha: string, against?: string) {
+    await this.requireFrame(frameId);
+    try { return { diff: await framePatch(this.root, frameId, sha, against || undefined) }; }
+    catch (error) { throw new RequestError(error instanceof Error ? error.message : 'git diff falhou.', 404); }
+  }
+  restoreHistory(frameId: string, sha: string) { return this.mutate(async () => {
+    await this.requireFrame(frameId);
+    let target = sha;
+    try { target = await restoreFrame(this.root, frameId, sha); }
+    catch (error) { throw new RequestError(error instanceof Error ? error.message : 'Não foi possível restaurar.', 404); }
+    await commitFrame(this.root, frameId, commitMessage(frameId, `restaurar ${target.slice(0, 7)}`));
+  }); }
+  async release(filter?: { id?: string; frameId?: string | null }): Promise<{ actors: PresenceActor[]; committed: string[] }> {
+    const before = await this.loadPresence();
+    const released = before.actors.filter(actor => {
+      if (!filter || (!filter.id && filter.frameId === undefined)) return true;
+      if (filter.id && actor.id === filter.id) return true;
+      if (filter.frameId !== undefined && (actor.frameId ?? null) === (filter.frameId ?? null)) return true;
+      return false;
+    });
+    const state = await this.clearPresence(filter);
+    const committed: string[] = [];
+    for (const frameId of [...new Set(released.map(actor => actor.frameId).filter((id): id is string => !!id && /^[a-zA-Z0-9_-]+$/.test(id)))]) {
+      if (await commitFrame(this.root, frameId, commitMessage(frameId, (await this.summaryLead(frameId)) || 'release'))) committed.push(frameId);
+    }
+    return { actors: state.actors, committed };
   }
 }
 

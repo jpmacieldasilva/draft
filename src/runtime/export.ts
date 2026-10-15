@@ -7,7 +7,7 @@ export async function exportWorkspace(folder: string, output: string, options: {
   const destination = path.resolve(output); if (destination === store.root || destination.startsWith(`${store.root}${path.sep}`)) throw new RequestError('Exporte para uma pasta fora do workspace.');
   try { await access(destination); throw new RequestError('A pasta de destino já existe. Escolha uma nova pasta.'); } catch (error) { if (error instanceof RequestError) throw error; }
   await mkdir(destination, { recursive: true }); await cp(viewerDirectory, destination, { recursive: true });
-  const workspace = await store.snapshot(); workspace.readOnly = true; workspace.token = ''; workspace.presence = []; if (options.feedback === false) workspace.feedback = [];
+  const workspace = await store.snapshot(); workspace.readOnly = true; workspace.token = ''; workspace.presence = []; delete workspace.folder; if (options.feedback === false) workspace.feedback = [];
   const content = path.join(destination, 'content'); await mkdir(content);
   async function copyDirectory(relative: string) {
     for (const entry of await readdir(await confined(store.root, relative), { withFileTypes: true })) {

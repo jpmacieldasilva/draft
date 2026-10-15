@@ -49,12 +49,14 @@ The user wants to **use Draft**: run the viewer, open the canvas, preview or exp
 
 When the user asks you to change prototypes or act on comments, follow this loop. Replace `draft` with `node <draft-clone>/dist/runtime/cli.js` if it is not on `PATH`.
 
-1. **Read first:** `draft context <workspace>`. It prints the manifest, READMEs, each frame's files, open comments (with frame, selector and message), active claims, and the emission rules. Do not generate HTML before reading it.
+1. **Read first:** `draft context <workspace>`. It prints the manifest, READMEs, each frame's files, open comments (with frame, selector and message), active claims, open questions, summaries, `research.md` when present, and the emission rules. Do not generate HTML before reading it.
 2. **Claim:** `draft presence claim <workspace> <frameId> --label <your name> --ttl 120`. Skip frames whose `claimedBy` is someone else.
 3. **Edit** only files under `frames/<frameId>/`. Classic HTML/CSS and local scripts; no ES modules, no network (CDNs, remote fonts and images are blocked unless the host is listed in `allowNetwork` in `experiment.json`). Add a stable `data-draftroom-id` to elements that get comments or Inspect tweaks.
-4. **Resolve** each comment you addressed: `draft feedback resolve <workspace> <id>`. List what is still open with `draft feedback list <workspace> --open`.
-5. **Release:** `draft presence clear <workspace> <frameId>`.
+4. **Ask** with MCP `ask_user` when you need a decision. The question stays in **Precisa de você** until it is answered in **Status**; read the answer from the next `get_context`. There is no CLI subcommand for this.
+5. **Summarize** with MCP `submit_summary` before you release: what you did, and each assumption you made on your own. Assumptions stay pending until accepted or rejected in **Status**. A rejection becomes an open comment.
+6. **Resolve** each comment you addressed: `draft feedback resolve <workspace> <id>`. List what is still open with `draft feedback list <workspace> --open`.
+7. **Release:** `draft presence clear <workspace> <frameId>` (or MCP `release`). In a Git repository this commits `frames/<frameId>/` as `draft(<frameId>): <first line of the summary>`, or `draft(<frameId>): release` when there is no summary. Exiting the process clears presence and does not commit.
 
-If the client supports MCP, `draft mcp <workspace>` offers the same loop as tools (`get_context`, `get_selection` for what the user has selected in the viewer, `claim`, `write_frame`, `resolve_feedback`, `release`, `update_manifest`).
+If the client supports MCP, `draft mcp <workspace>` offers the same loop as tools (`get_context`, `get_selection` for what the user has selected in the viewer, `claim`, `ask_user`, `submit_summary`, `write_frame`, `resolve_feedback`, `release`, `update_manifest`). `ask_user` and `submit_summary` are refused while another actor holds the claim.
 
-The open viewer reloads edited frames and updates comments by itself. Local metadata lives in `.draft/` (layout, feedback, presence, undo baselines); never edit it by hand. Inspect writes to the frame's HTML only when the user presses **Salvar ajuste**.
+The open viewer reloads edited frames and updates comments, questions and summaries by itself. The frame badge follows the same order: open comment or open question, then an active claim, then a submitted summary. Local metadata lives in `.draft/` (layout, feedback, presence, undo baselines); never edit it by hand. Questions and summaries are `frames/<id>/questions.json` and `frames/<id>/summary.json`. Inspect writes to the frame's HTML only when the user presses **Salvar**. In a Git repository that save is one commit, `draft(<id>): salvar ajuste`, covering only the files the tweak changed. Without a Git repository the viewer shows **Sem Git** and skips those commits.

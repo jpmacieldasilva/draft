@@ -2,13 +2,13 @@ import { normalizeLocale, setLocale, t, DEFAULT_LOCALE } from '../i18n';
 import type { Feedback, Frame, Layout, Position, PresenceActor, Target, Workspace } from '../protocol';
 declare global { interface Window { __DRAFTROOM__?: Workspace } }
 export type Mode = 'interact' | 'element' | 'comment';
-interface State { workspace?: Workspace; layout: Layout; mode: Mode; selected?: string; presenting?: string; info?: string; target?: {frameId: string; target: Target}; feedback?: string; error?: string; busy: boolean; comments: boolean; inspector: boolean; newFrame?: boolean; notice?: string; compare?: { group: string; variant?: string }; blocked: Record<string, string[]> }
+interface State { workspace?: Workspace; layout: Layout; mode: Mode; selected?: string; presenting?: string; info?: string; target?: {frameId: string; target: Target}; feedback?: string; error?: string; busy: boolean; comments: boolean; inspector: boolean; newFrame?: boolean; notice?: string; compare?: { group: string; variant?: string }; blocked: Record<string, string[]>; statusOpen: boolean; connectOpen: boolean; historyFrame?: string; code: Record<string, boolean> }
 const listeners = new Set<() => void>();
 let layoutDirty = false;
 let layoutRevision = '';
 let layoutVersion = 0;
 let layoutSaving = false;
-let state: State = { layout: { frames: {}, zoom: .65, x: 80, y: 120 }, mode: 'interact', busy: false, comments: false, inspector: false, blocked: {} };
+let state: State = { layout: { frames: {}, zoom: .65, x: 80, y: 120 }, mode: 'interact', busy: false, comments: false, inspector: false, blocked: {}, statusOpen: false, connectOpen: false, code: {} };
 export const iframes = new Map<string, HTMLIFrameElement>();
 export function subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 export function snapshot() { return state; }
@@ -148,7 +148,7 @@ function onMessage(event:MessageEvent<unknown>) {
  }
 }
 function onKey(event:KeyboardEvent) {
- if(event.key==='Escape') { setMode('interact'); update({target:undefined,info:undefined,comments:false,inspector:false,compare:undefined}); leavePresentation(); }
+ if(event.key==='Escape') { setMode('interact'); update({target:undefined,info:undefined,comments:false,inspector:false,compare:undefined,statusOpen:false,connectOpen:false,historyFrame:undefined}); leavePresentation(); }
  if(event.target instanceof HTMLElement && event.target.closest('input,textarea,select,[contenteditable],form')) return;
  if(presentationKey(event.key)) { event.preventDefault(); return; }
  if(event.key==='0') fit();
@@ -161,6 +161,7 @@ function onKey(event:KeyboardEvent) {
  if(event.key==='-') zoomBy(1/1.15);
 }
 
+export function showCode(frameId: string, open: boolean) { update({ code: { ...state.code, [frameId]: open }, selected: frameId }); }
 export function activeClaim(frameId?: string | null): PresenceActor | undefined {
   if (!frameId) return undefined;
   const now = Date.now();

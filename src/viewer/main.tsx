@@ -1,4 +1,4 @@
-import { useSyncExternalStore, type PointerEvent, type FormEvent } from 'react';
+import { useEffect, useState, useSyncExternalStore, type PointerEvent, type FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MousePointer2, Scan, Info as InfoIcon, Play, MoreHorizontal, ChevronDown, X, Plus, Minus, Maximize, ArrowLeft, MessageSquare, MoveDiagonal, SquareDashed } from 'lucide-react';
 import { Markdown } from './markdown';
@@ -9,9 +9,12 @@ import '@astryxdesign/core/reset.css';
 import '@astryxdesign/core/astryx.css';
 import '@astryxdesign/theme-neutral/theme.css';
 import './style.css';
-import type { Frame, Position } from '../protocol';
+import { frameActivity, type Frame, type Position } from '../protocol';
 import { t } from '../i18n';
-import { subscribe, snapshot, update, initialize, framePosition, iframes, setPosition, saveLayout, setLayout, fit, zoomBy, setMode, present, leavePresentation, syncBridge, mutate, refresh, discardLayoutConflict, activeClaim, compareGroups, nextSteps, followFlow } from './store';
+import { subscribe, snapshot, update, initialize, framePosition, iframes, setPosition, saveLayout, setLayout, fit, zoomBy, setMode, present, leavePresentation, syncBridge, mutate, refresh, discardLayoutConflict, activeClaim, compareGroups, nextSteps, followFlow, showCode } from './store';
+import { StatusPanel } from './status-panel';
+import { ConnectModal } from './connect-modal';
+import { HistoryPanel } from './history-panel';
 const PRODUCT_NAME = 'Draft';
 function useStore() { return useSyncExternalStore(subscribe,snapshot); }
 function startMove(event:PointerEvent<HTMLElement>, frame:Frame, resize = false) {
@@ -57,15 +60,24 @@ function NewFrame() {
  const submit=(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();const title=new FormData(event.currentTarget).get('title');if(typeof title!=='string'||!title.trim())return;void mutate('frames',{title}).then(()=>{if(!snapshot().error)update({newFrame:false});});};
  return <div className="scrim" onClick={()=>update({newFrame:false})}><section role="dialog" aria-modal="true" aria-label={t('app.addPrototype')} className="info-sheet create-sheet" onClick={event=>event.stopPropagation()}><button className="close" aria-label={t('create.close')} onClick={()=>update({newFrame:false})}><X/></button><p className="muted">{t('create.eyebrow')}</p><h1>{t('app.addPrototype')}</h1><p className="create-copy">{t('create.copy')}</p><form onSubmit={submit} className="create-form"><label>{t('create.name')}<input autoFocus name="title" placeholder={t('create.placeholder')} maxLength={200} required/></label><div className="create-actions"><button type="button" onClick={()=>update({newFrame:false})}>{t('create.cancel')}</button><button className="primary" type="submit" disabled={state.busy}>{t('create.submit')}</button></div></form></section></div>;
 }
+function FrameSource({frame}:{frame:Frame}) {
+ const [content,setContent]=useState(''); const [failed,setFailed]=useState(false);
+ useEffect(()=>{ let cancel=false; setFailed(false); void fetch(`./api/frames/${encodeURIComponent(frame.id)}/source`).then(async response=>{ if(!response.ok) throw new Error('source'); return response.json() as Promise<{content:string}>; }).then(body=>{ if(!cancel) setContent(body.content); }).catch(()=>{ if(!cancel) setFailed(true); }); return ()=>{ cancel=true; }; },[frame.id,frame.entry]);
+ if(failed) return <p className="frame-error">{t('frame.codeError')}</p>;
+ return <pre className="frame-source" tabIndex={0}>{content}</pre>;
+}
 function FrameView({frame}:{frame:Frame}) {
  const state=useStore(), position=framePosition(frame), presenting=state.presenting===frame.id;
  const comments=state.workspace?.feedback.filter(comment=>comment.frameId===frame.id) ?? [];
  const claim = activeClaim(frame.id);
+ const activity = state.workspace ? frameActivity(frame.id, state.workspace) : null;
+ const showingCode = !!state.code[frame.id];
  return <article className={`frame ${presenting?'presenting':''} ${state.selected===frame.id?'selected':''}${claim?' agent-active':''}`} style={{left:position.x,top:position.y,width:position.width,height:position.height+44,display:position.hidden&&!presenting?'none':undefined}} aria-label={frame.title} data-frame-id={frame.id} title={claim ? t('frame.agentHere') : undefined}>
   <header className="frame-header" onPointerDown={event=>startMove(event,frame)}>
    <button className="frame-title" onClick={()=>update({selected:frame.id})}>{frame.title}</button>
    {frame.state&&<span className="frame-badge frame-state" title={t('frame.stateTitle')}>{frame.state}</span>}
    {frame.role&&<span className={`frame-badge frame-role-${frame.role}`} title={frame.group?t('frame.groupTitle',{group:frame.group}):undefined}>{t(`role.${frame.role}`)}</span>}
+   {activity&&<span className={`frame-badge frame-activity frame-activity-${activity}`} data-activity={activity}>{t(activity==='needs-you'?'status.needsYou':activity==='working'?'status.working':'status.ready')}</span>}
    {claim&&<span className="agent-pill" title={t('frame.agentHere')}>{t('frame.agent')}</span>}
    <ViewportControls frame={frame}/>
    <button className="icon-button" aria-label={t('frame.info',{title:frame.title})} title={t('frame.infoTitle')} onClick={()=>update({info:frame.id})}><InfoIcon/></button>
@@ -74,11 +86,13 @@ function FrameView({frame}:{frame:Frame}) {
     <form onSubmit={event=>renameFrame(event,frame.id)}><label>{t('frame.newTitle')}<input name="title" defaultValue={frame.title} required maxLength={120}/></label><button type="submit">{t('frame.rename')}</button></form>
     <button onClick={()=>void mutate(`frames/${encodeURIComponent(frame.id)}/duplicate`,{})}>{t('frame.duplicate')}</button>
     <button onClick={()=>setPosition(frame.id,{...position,hidden:true})}>{t('frame.hide')}</button>
+    <button onClick={()=>update({historyFrame:frame.id})}>{t('frame.history')}</button>
    </div></details>}
   </header>
   {!!state.blocked[frame.id]?.length&&<p className="frame-warning" role="status">{t('frame.blocked',{hosts:state.blocked[frame.id].join(', ')})}</p>}
   <div className="frame-content">
-   {frame.error ? <div className="frame-error"><h2>{t('frame.errorTitle')}</h2><p>{frame.error}</p><button onClick={()=>void refresh()}>{t('app.retry')}</button></div> : <iframe ref={element=>{if(element) iframes.set(frame.id,element);else iframes.delete(frame.id);}} src={frame.url ?? `./content/${frame.entry}`} title={frame.title} sandbox="allow-scripts" onLoad={()=>syncBridge(frame.id)}/>}
+   <div className="frame-view-toggle" role="group" aria-label={t('frame.view')}><button type="button" aria-pressed={!showingCode} onClick={()=>showCode(frame.id,false)}>{t('frame.preview')}</button><button type="button" aria-pressed={showingCode} onClick={()=>showCode(frame.id,true)}>{t('frame.code')}</button></div>
+   {showingCode ? <FrameSource frame={frame}/> : frame.error ? <div className="frame-error"><h2>{t('frame.errorTitle')}</h2><p>{frame.error}</p><button onClick={()=>void refresh()}>{t('app.retry')}</button></div> : <iframe ref={element=>{if(element) iframes.set(frame.id,element);else iframes.delete(frame.id);}} src={frame.url ?? `./content/${frame.entry}`} title={frame.title} sandbox="allow-scripts" onLoad={()=>syncBridge(frame.id)}/>}
    {comments.filter(comment=>comment.status==='open').map((comment,index)=><button key={comment.id} className={`pin ${state.feedback===comment.id?'active':''}`} style={{left:comment.target.rect.x,top:comment.target.rect.y}} title={comment.message} aria-label={t('frame.comment',{n:index+1,message:comment.message})} onClick={()=>update({feedback:comment.id,comments:true,inspector:false,target:undefined,selected:frame.id})}>{index+1}</button>)}
    {state.target?.frameId===frame.id&&state.target.target.kind==='region'&&<div className="selection" style={{left:state.target.target.rect.x,top:state.target.target.rect.y,width:state.target.target.rect.width,height:state.target.target.rect.height}}/>}
   </div>
@@ -122,7 +136,7 @@ function Compare() {
    <label>{t('compare.variant')}<select value={variant.id} onChange={event=>update({compare:{group:group.name,variant:event.currentTarget.value}})}>{group.variants.map(frame=><option key={frame.id} value={frame.id}>{frame.title}</option>)}</select></label>
    <button className="close" aria-label={t('compare.close')} onClick={close}><X/></button></header>
   {(decision?.criteria||decision?.hypothesis)&&<dl className="decision compare-criteria">{decision.hypothesis&&<><dt>{t('meta.hypothesis')}</dt><dd>{decision.hypothesis}</dd></>}{decision.criteria&&<><dt>{t('meta.criteria')}</dt><dd>{decision.criteria}</dd></>}</dl>}
-  <div className="compare-panes">{([[t('role.control'),group.control],[t('role.variant'),variant]] as const).map(([label,frame])=><figure key={label}><figcaption><span className="muted">{label}</span><strong>{frame.title}</strong>{frame.tests&&<p>{frame.tests}</p>}{frame.signal&&<code>{frame.signal}</code>}</figcaption><iframe key={frame.id} title={`${label}: ${frame.title}`} src={frame.url ?? `./content/${frame.entry}`} sandbox="allow-scripts" style={{width:frame.viewport.width,height:frame.viewport.height}}/></figure>)}</div>
+  <div className="compare-panes">{([[t('role.control'),group.control],[t('role.variant'),variant]] as const).map(([label,frame])=><figure key={frame.id}><figcaption><span className={`frame-badge frame-role-${frame.role??'variant'}`}>{label}</span><strong>{frame.title}</strong>{(decision?.hypothesis||decision?.criteria)&&<dl className="decision compare-frame-decision">{decision?.hypothesis&&<><dt>{t('meta.hypothesis')}</dt><dd>{decision.hypothesis}</dd></>}{decision?.criteria&&<><dt>{t('meta.criteria')}</dt><dd>{decision.criteria}</dd></>}</dl>}{frame.tests&&<p>{frame.tests}</p>}{frame.signal&&<code>{frame.signal}</code>}</figcaption><iframe key={frame.id} title={`${label}: ${frame.title}`} src={frame.url ?? `./content/${frame.entry}`} sandbox="allow-scripts" style={{width:frame.viewport.width,height:frame.viewport.height}}/></figure>)}</div>
  </section></div>;
 }
 function InspectorPanel() {
@@ -147,7 +161,7 @@ function App() {
  if(!workspace) return <main className="loading"><span className="brand">{PRODUCT_NAME}<span>✳</span></span><p>{state.error ?? t('app.loading')}</p>{state.error&&<Button label={t('app.retry')} onClick={()=>void refresh()}/>}</main>;
  const hidden=workspace.experiment.frames.filter(frame=>framePosition(frame).hidden);
  return <main className={state.presenting?'app is-presenting':'app'}>
-  <header className="topbar"><div className="identity"><span className="brand">{PRODUCT_NAME}<span>✳</span></span><span className="divider"/><button className="workspace-title" onClick={()=>update({info:'workspace'})}>{workspace.experiment.title}<ChevronDown/></button></div><div className="topbar-end"><span className="save-state" role="status">{workspace.readOnly?t('app.readOnly'):state.busy?t('app.saving'):''}</span>{!workspace.readOnly&&<button className="add-frame" onClick={()=>update({newFrame:true})}><Plus/>{t('app.addPrototype')}</button>}{compareGroups(workspace.experiment.frames).length>0&&<button className="compare-toggle" onClick={()=>update({compare:{group:compareGroups(workspace.experiment.frames)[0].name}})}>{t('app.compare')}</button>}<button className="feedback-toggle" onClick={()=>update({comments:!state.comments,inspector:false})}><MessageSquare/>{t('app.comments')} <span>{workspace.feedback.filter(comment=>comment.status==='open').length}</span></button></div></header>
+  <header className="topbar"><div className="identity"><span className="brand">{PRODUCT_NAME}<span>✳</span></span><span className="divider"/><button className="workspace-title" onClick={()=>update({info:'workspace'})}>{workspace.experiment.title}<ChevronDown/></button></div><div className="topbar-end">{!workspace.readOnly&&workspace.git===false&&<span className="git-pill" role="status" aria-label={t('git.missing')}>{t('git.short')}</span>}<span className="save-state" role="status">{workspace.readOnly?t('app.readOnly'):state.busy?t('app.saving'):''}</span>{!workspace.readOnly&&<button className="status-toggle" onClick={()=>update({statusOpen:!state.statusOpen})}>{t('status.open')}</button>}{!workspace.readOnly&&workspace.folder&&<button className="connect-toggle" onClick={()=>update({connectOpen:true})}>{t('connect.open')}</button>}{!workspace.readOnly&&<button className="add-frame" onClick={()=>update({newFrame:true})}><Plus/>{t('app.addPrototype')}</button>}{compareGroups(workspace.experiment.frames).length>0&&<button className="compare-toggle" onClick={()=>update({compare:{group:compareGroups(workspace.experiment.frames)[0].name}})}>{t('app.compare')}</button>}<button className="feedback-toggle" onClick={()=>update({comments:!state.comments,inspector:false})}><MessageSquare/>{t('app.comments')} <span>{workspace.feedback.filter(comment=>comment.status==='open').length}</span></button></div></header>
   <div className="canvas" style={{backgroundSize:`${24*state.layout.zoom}px ${24*state.layout.zoom}px`,backgroundPosition:`${state.layout.x}px ${state.layout.y}px`}} onPointerDown={startPan} onWheel={event=>{if(event.target!==event.currentTarget)return;if(event.ctrlKey||event.metaKey){event.preventDefault();zoomBy(event.deltaY>0?.94:1.06);}else setLayout({...state.layout,x:state.layout.x-event.deltaX,y:state.layout.y-event.deltaY});}}>
    <div className="world" style={{transform:state.presenting?'none':`translate(${state.layout.x}px,${state.layout.y}px) scale(${state.layout.zoom})`}}><FlowConnections/>{workspace.experiment.frames.map(frame=><FrameView key={frame.id} frame={frame}/>)}</div>
    {workspace.experiment.frames.length===0&&<div className="empty-canvas"><h1>{t('app.emptyTitle')}</h1><p>{t('app.emptyBody')}</p></div>}
@@ -158,7 +172,8 @@ function App() {
   {state.mode==='element'&&<div className="mode-hint">{t('hint.inspect')}<button onClick={()=>setMode('interact')}>{t('hint.done')}</button></div>}
   {state.mode==='comment'&&<div className="mode-hint">{t('hint.comment')}<button onClick={()=>setMode('interact')}>{t('hint.done')}</button></div>}
   {(state.notice||state.error||workspace.diagnostics.length>0)&&<div className="notice" role="alert">{[state.notice, state.error ?? workspace.diagnostics.join(' · ')].filter(Boolean).join(' · ')}{state.error&&<button onClick={()=>void discardLayoutConflict()}>{t('notice.reloadLayout')}</button>}{state.notice&&!state.error&&<button onClick={()=>update({notice:undefined})}>{t('notice.close')}</button>}</div>}
-  <MiniMap/><ConnectionControls/><Info/><InspectorPanel/><Comments/><NewFrame/><Compare/>
+  {workspace.research&&!state.statusOpen&&<aside className="research-note" aria-label={t('research.title')}><h2>{t('research.title')}</h2><Markdown source={workspace.research}/></aside>}
+  <MiniMap/><ConnectionControls/><Info/><InspectorPanel/><Comments/><StatusPanel/><NewFrame/><Compare/><ConnectModal/><HistoryPanel/>
  </main>;
 }
 const root=document.getElementById('root'); if(root) createRoot(root).render(<App/>);

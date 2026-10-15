@@ -83,3 +83,17 @@ Rede:
 14. Um recurso remoto é bloqueado pela CSP e ninguém fica sabendo. (`network.spec.ts` — "recurso remoto bloqueado mostra aviso no frame")
 15. `allowNetwork` aceita curinga, esquema, espaço ou palavra-chave de CSP e alarga a política. (`network.spec.ts` — "allowNetwork recusa entradas perigosas")
 16. Um host liberado em `allowNetwork` continua bloqueado ou gera aviso. (`network.spec.ts` — "host liberado entra na CSP e não gera aviso")
+
+## Fase 5 — Status, decisões, histórico e Inspect
+
+1. Um claim não muda o selo do frame em até 2 s, ou o selo continua em andamento depois do release sem resumo. (`decisions.spec.ts` — "claim muda o selo do frame em até 2 segundos")
+2. `ask_user` não entra na fila "precisa de você", ou a pergunta continua lá depois da resposta. (`decisions.spec.ts` — "ask_user entra na fila e sai quando é respondida")
+3. Salvar no Inspect altera outro arquivo além de `frames/<id>/index.html`, ou não gera exatamente um commit. (`decisions.spec.ts` — "salvar no Inspect altera só o HTML do frame e gera um commit")
+4. Restaurar original não devolve o arquivo byte a byte. (`decisions.spec.ts` — "restaurar original devolve o HTML byte a byte")
+5. O histórico de um frame lista commits de outro frame, ou restaurar uma revisão altera outro frame. (`decisions.spec.ts` — "histórico lista só commits do frame e restaurar volta aquela versão")
+6. Rejeitar uma suposição não gera comentário, ou aceitar gera. (`decisions.spec.ts` — "rejeitar suposição gera comentário e aceitar não")
+7. Sem `.git` o viewer quebra ou esconde o aviso. (`decisions.spec.ts` — "pasta sem git mostra aviso e o canvas continua")
+8. Inspect com claim ativo grava o HTML do frame. (`decisions.spec.ts` — "claim ativo bloqueia salvar no Inspect")
+9. A vista de código aceita edição, ou `research.md` não entra no contexto. (`decisions.spec.ts` — "código é somente leitura e a nota de pesquisa entra no contexto")
+10. O modal Conectar agente omite um cliente ou o caminho do workspace. (`decisions.spec.ts` — "conectar agente mostra o comando de cada cliente")
+11. Comparar esconde o papel ou a decisão em um dos frames. (`decisions.spec.ts` — "comparar mostra papel e decisão em cada frame")
