@@ -182,7 +182,7 @@ test('bundle estático abre em subpasta sem API e preserva interação',async({p
   await page.getByRole('button',{name:/Canvas/}).click();
   await expect(page.getByText('Somente leitura',{exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:/Inspecionar/})).toHaveCount(0);
- } finally {await new Promise<void>(resolve=>staticServer.close(()=>resolve()));await rm(output,{recursive:true,force:true});}
+ } finally {await new Promise<void>(resolve=>{staticServer.close(()=>resolve());staticServer.closeAllConnections();});await rm(output,{recursive:true,force:true});}
 });
 
 test('sincroniza composição entre abas antes de uma nova alteração',async({page,context})=>{
@@ -199,26 +199,37 @@ test('sincroniza composição entre abas antes de uma nova alteração',async({p
  await expect.poll(async()=>JSON.parse(await readFile(path.join(stateDir(folder),'layout.json'),'utf8').catch(()=>'{"frames":{"base":{"x":0,"width":960}}}')).frames.base.x).toBe(30);
 });
 
-test('edita visualmente, preserva ajustes sucessivos e restaura o original',async({page})=>{
- await page.goto(url);
+test('edita visualmente, preserva ajustes sucessivos e restaura o original',async({page,studio})=>{
+ const htmlPath=path.join(studio.folder,'frames/base/index.html');
+ const original=await readFile(htmlPath,'utf8');
+ await page.goto(studio.url);
  const title=page.frameLocator('iframe[title="Base clara"]').getByRole('heading',{name:/^Datas/});
- await page.getByRole('button',{name:'Inspecionar',exact:false}).click();await title.click();
- await expect(page.getByText('Selecionado',{exact:true})).toBeVisible();
+ const openInspect=async()=>{
+  await page.getByRole('button',{name:'Inspecionar',exact:false}).click();
+  await title.click();
+  await expect(page.getByText('Selecionado',{exact:true})).toBeVisible();
+ };
+ await openInspect();
  await expect(page.getByText('Layout',{exact:true})).toHaveCount(0);
  await page.getByRole('spinbutton',{name:'Tamanho do texto (px)',exact:true}).fill('30');
+ await expect(page.getByText('Não salvo',{exact:true})).toBeVisible();
  await expect(title).toHaveCSS('font-size','30px');
  await page.getByRole('button',{name:'Salvar ajuste',exact:true}).click();
  await expect(page.getByText('Ajuste salvo.',{exact:true})).toBeVisible();
- await page.getByText('Espaçamento',{exact:true}).click();
+ await expect.poll(async()=>/font-size:\s*30px/i.test(await readFile(htmlPath,'utf8'))).toBe(true);
  await page.getByRole('spinbutton',{name:'Espaço interno (px)',exact:true}).fill('12');
+ await expect(page.getByText('Não salvo',{exact:true})).toBeVisible();
+ await expect(title).toHaveCSS('padding-top','12px');
  await page.getByRole('button',{name:'Salvar ajuste',exact:true}).click();
- await expect.poll(async()=>/padding:\s*12px/i.test(await readFile(path.join(folder,'frames/base/index.html'),'utf8'))).toBe(true);
- await page.reload();await expect(title).toHaveCSS('font-size','30px');await expect(title).toHaveCSS('padding-top','12px');
- await page.getByRole('button',{name:'Inspecionar',exact:false}).click();await title.click();
+ await expect.poll(async()=>{const html=await readFile(htmlPath,'utf8');return /padding:\s*12px/i.test(html)&&/font-size:\s*30px/i.test(html);}).toBe(true);
+ await page.reload();
+ await expect(title).toHaveCSS('font-size','30px');
+ await expect(title).toHaveCSS('padding-top','12px');
+ await openInspect();
  await page.getByRole('button',{name:'Restaurar original',exact:true}).click();
- await expect.poll(async()=>!(/font-size:\s*30px/i.test(await readFile(path.join(folder,'frames/base/index.html'),'utf8')))).toBe(true);
- await expect.poll(async()=>await title.evaluate(element=>getComputedStyle(element).fontSize)).toBe('13px');
- await expect.poll(async()=>await title.evaluate(element=>getComputedStyle(element).paddingTop)).toBe('0px');
+ await expect.poll(async()=>await readFile(htmlPath,'utf8')).toBe(original);
+ await expect.poll(async()=>title.evaluate(element=>getComputedStyle(element).fontSize)).toBe('13px');
+ await expect.poll(async()=>title.evaluate(element=>getComputedStyle(element).paddingTop)).toBe('0px');
 });
 
 test('cria conexão rotulada e navega no minimapa',async({page})=>{
