@@ -149,11 +149,17 @@ label { display: grid; gap: var(--space-8); font-size: var(--text-12); }
   box-shadow: none;
 }
 .frame-status-working { background: var(--color-accent); }
-.frame-status-needs-you { background: var(--state-alert); }
+.frame-status-needs-you {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  min-height: 8px;
+  background: var(--state-alert);
+  box-shadow: 0 0 0 2px transparent, 0 0 0 4px var(--state-alert);
+}
 button.frame-status { position: relative; cursor: pointer; }
 button.frame-status::after { content: ""; position: absolute; inset: -9px; }
-button.frame-status:hover,
-button.frame-status:focus-visible { background: var(--state-alert); }
+button.frame-status-needs-you:focus-visible { outline-offset: 6px; }
 .frame-role {
   flex: none;
   font-size: var(--text-12);

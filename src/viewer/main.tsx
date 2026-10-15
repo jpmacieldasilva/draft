@@ -75,11 +75,9 @@ function RoleChip({ frame, frames }: { frame: Frame; frames: Frame[] }) {
  return <button type="button" className={`frame-role frame-role-${frame.role}`} data-testid="frame-role" aria-label={t('compare.label')} title={frame.group ? t('frame.groupTitle', { group: frame.group }) : undefined} onClick={() => update({ selected: frame.id, compare: { group, variant: frame.role === 'variant' ? frame.id : undefined } })}>{label} ⇄</button>;
 }
 function FrameState({ frameId, activity }: { frameId: string; activity: ReturnType<typeof frameActivity> }) {
- const label = activity === 'needs-you' ? t('status.needsYou') : activity === 'working' ? t('status.working') : activity === 'ready' ? t('status.ready') : undefined;
+ const label = activity === 'needs-you' ? t('status.needsYou') : activity === 'working' ? t('status.working') : activity === 'ready' ? t('status.ready') : t('status.idle');
  const className = `frame-status frame-status-${activity ?? 'idle'}`;
- if (activity === 'needs-you' && label) return <button type="button" className={className} data-testid="frame-activity" data-activity={activity} title={label} aria-label={label} onClick={() => update({ statusOpen: true, selected: frameId, inspector: false })} />;
- if (label) return <span className={className} role="img" data-testid="frame-activity" data-activity={activity} title={label} aria-label={label} />;
- return <span className={className} data-testid="frame-activity" data-activity="idle" aria-hidden="true" />;
+ return <button type="button" className={className} data-testid="frame-activity" data-activity={activity ?? 'idle'} title={label} aria-label={label} onClick={activity === 'needs-you' ? () => update({ statusOpen: true, selected: frameId, inspector: false }) : undefined} />;
 }
 function FrameView({frame}:{frame:Frame}) {
  const state=useStore(), position=framePosition(frame), presenting=state.presenting===frame.id;

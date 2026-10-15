@@ -10,6 +10,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 - Canvas frames use the frame shadow and a 12px radius, with 96px between frames. The frame name stays visible; size and frame actions appear when the frame is selected or focused. Flow filters live in the side panel. Compare opens from the role chip. The top bar keeps the project name and **Adicionar protótipo**.
 - Frame headers show the name, a 6px state dot, and the role chip. Status words are the dot tooltip; the terracotta dot opens the agent question in the side panel. Small labels above titles and helper lines are removed. Compare shows the hypothesis and the criterion once.
+- Every state dot is a keyboard-focusable button with an accessible name. **Precisa de você** is an 8px dot with a 2px ring; Enter or Space opens the question.
 - **Breaking:** flow connections are stored in `experiment.json` (`edges`) instead of `.draft/layout.json`, so they are shared through Git. Existing connections are migrated on open. `POST /api/edges` replaces the layout field.
 
 ### Fixed

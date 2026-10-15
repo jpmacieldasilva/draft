@@ -60,14 +60,27 @@ test('o canvas mostra os quatro frames do estudo', async ({ page, studio }) => {
 test('claim muda o selo do frame em até 2 segundos', async ({ page, studio }) => {
  await page.goto(studio.url);
  const frame = lateral(page);
- await expect(frame.getByRole('img', { name: 'Em andamento', exact: true })).toHaveCount(0);
+ const idle = frame.getByRole('button', { name: 'Em espera', exact: true });
+ await expect(idle).toBeVisible();
+ await frame.getByRole('button', { name: 'Compacta com barra lateral', exact: true }).focus();
+ await page.keyboard.press('Tab');
+ await expect(idle).toBeFocused();
+ await expect(idle).toHaveAccessibleName('Em espera');
  expect((await runCli(['presence', 'claim', studio.folder, 'lateral', '--label', 'Codex', '--ttl', '120'])).code).toBe(0);
- await expect(frame.getByRole('img', { name: 'Em andamento', exact: true })).toBeVisible({ timeout: 2000 });
+ const working = frame.getByRole('button', { name: 'Em andamento', exact: true });
+ await expect(working).toBeVisible({ timeout: 2000 });
+ await expect(working).toHaveCSS('width', '6px');
+ await expect(working).toHaveCSS('height', '6px');
+ await frame.getByRole('button', { name: 'Compacta com barra lateral', exact: true }).focus();
+ await page.keyboard.press('Tab');
+ await expect(working).toBeFocused();
+ await expect(working).toHaveAccessibleName('Em andamento');
  await page.getByRole('button', { name: 'Centralizar frames', exact: true }).click();
  await shot(page, 'status-working');
  expect((await runCli(['presence', 'clear', studio.folder, 'lateral'])).code).toBe(0);
- await expect(frame.getByRole('img', { name: 'Em andamento', exact: true })).toHaveCount(0, { timeout: 2000 });
- await expect(frame.getByRole('img', { name: 'Pronto', exact: true })).toHaveCount(0);
+ await expect(working).toHaveCount(0, { timeout: 2000 });
+ await expect(frame.getByRole('button', { name: 'Pronto', exact: true })).toHaveCount(0);
+ await expect(idle).toBeVisible();
 });
 
 test('ask_user entra na fila e sai quando é respondida', async ({ page, studio }) => {
@@ -79,9 +92,22 @@ test('ask_user entra na fila e sai quando é respondida', async ({ page, studio 
   const frame = base(page);
   const needsYou = frame.getByRole('button', { name: 'Precisa de você', exact: true });
   await expect(needsYou).toBeVisible({ timeout: 2000 });
-  await frame.getByRole('button', { name: 'Base clara', exact: true }).click();
-  await needsYou.click();
+  await expect(needsYou).toHaveAccessibleName('Precisa de você');
+  await expect(needsYou).toHaveCSS('width', '8px');
+  await expect(needsYou).toHaveCSS('height', '8px');
+  expect(await needsYou.evaluate(element => getComputedStyle(element).boxShadow)).toContain('rgb(194, 85, 61)');
+  await frame.getByRole('button', { name: 'Base clara', exact: true }).focus();
+  await page.keyboard.press('Tab');
+  await expect(needsYou).toBeFocused();
+  await page.keyboard.press('Enter');
   const panel = page.getByRole('complementary', { name: 'Status dos frames' });
+  await expect(panel.getByText('Qual margem você prefere?')).toBeVisible();
+  await panel.getByRole('button', { name: 'Fechar status', exact: true }).click();
+  await expect(panel).toHaveCount(0);
+  await frame.getByRole('button', { name: 'Base clara', exact: true }).focus();
+  await page.keyboard.press('Tab');
+  await expect(needsYou).toBeFocused();
+  await page.keyboard.press('Space');
   await expect(panel.getByText('Qual margem você prefere?')).toBeVisible();
   await shot(page, 'status-needs-you');
   const question = panel.locator('form').filter({ hasText: 'Qual margem você prefere?' });
@@ -89,7 +115,7 @@ test('ask_user entra na fila e sai quando é respondida', async ({ page, studio 
   await question.getByRole('button', { name: 'Responder', exact: true }).click();
   await expect(panel.getByText('Qual margem você prefere?')).toHaveCount(0);
   await expect(needsYou).toHaveCount(0);
-  await expect(frame.getByRole('img', { name: 'Em andamento', exact: true })).toBeVisible();
+  await expect(frame.getByRole('button', { name: 'Em andamento', exact: true })).toBeVisible();
   const context = (await mcp.call<{ questions: Array<{ prompt: string; answer?: string; status: string }> }>('get_context')).json();
   expect(context.questions.find(item => item.prompt === 'Qual margem você prefere?')).toMatchObject({ status: 'answered', answer: 'A margem curta.' });
  } finally { await mcp.close(); }
@@ -183,7 +209,12 @@ test('rejeitar suposição gera comentário e aceitar não', async ({ page, stud
   expect(released.json().committed).toEqual(['base']);
   expect((await git(studio.folder, ['log', '-1', '--format=%s'])).trim()).toMatch(/^draft\(base\): /);
   expect(await git(studio.folder, ['show', '--stat', '--format=', 'HEAD'])).toContain('frames/base/summary.json');
-  await expect(base(page).getByRole('img', { name: 'Pronto', exact: true })).toBeVisible({ timeout: 2000 });
+  const ready = base(page).getByRole('button', { name: 'Pronto', exact: true });
+  await expect(ready).toBeVisible({ timeout: 2000 });
+  await base(page).getByRole('button', { name: 'Base clara', exact: true }).focus();
+  await page.keyboard.press('Tab');
+  await expect(ready).toBeFocused();
+  await expect(ready).toHaveAccessibleName('Pronto');
   await page.getByRole('button', { name: 'Status', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'Status dos frames' });
   await expect(panel.getByText('Ajustei a leitura.')).toBeVisible();
