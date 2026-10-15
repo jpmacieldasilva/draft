@@ -104,4 +104,49 @@ details[open]>.menu,details[open]>.viewport-panel{animation:menu-enter var(--mot
 .compare-panes iframe{border:1px solid #e3e7ee;border-radius:12px;background:#fff;max-width:100%}
 .presentation-flow{display:flex;gap:6px;align-items:center}
 .presentation-flow button::after{content:" →"}
+.git-pill{flex:none;font-size:11px;line-height:1;color:#8a5a00;background:#fff6e8;border:1px solid #f0ddb4;border-radius:999px;padding:5px 8px}
+.frame-activity-working{background:#e7eefc;color:#2c4f93}
+.frame-activity-needs-you{background:#fff1d6;color:#8a5a00}
+.frame-activity-ready{background:#e5f4ea;color:#21643c}
+.frame-content{position:relative}
+.frame-view-toggle{position:absolute;z-index:4;top:8px;right:8px;display:inline-flex;border:1px solid #d5dce7;border-radius:999px;overflow:hidden;background:#fffc}
+.frame-view-toggle button{font-size:10px;line-height:1;padding:5px 8px;color:#576376}
+.frame-view-toggle button[aria-pressed=true]{background:#25334a;color:#fff}
+.frame-source{margin:0;height:100%;overflow:auto;padding:16px;background:#f7f8fb;color:#253040;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
+.editor-breadcrumb{display:flex;gap:6px;align-items:center;min-width:0;font-size:11px;color:#657183}
+.editor-breadcrumb button{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#2c4f93;text-align:left}
+.editor-breadcrumb span{flex:none;max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.editor-breadcrumb span::before{content:"/";margin-right:6px;color:#b0b8c4}
+.editor-savebar{display:flex;align-items:center;justify-content:flex-end;gap:8px;position:sticky;top:0;z-index:3;background:#fcfcfd;padding:4px 0 8px}
+.editor-unsaved{margin-right:auto;font-size:11px;font-weight:600;color:#8a5a00}
+.editor-hint{margin:8px 0 0;font-size:11px;color:#7a8494}
+.status-panel{left:20px;right:auto}
+.status-group{padding:4px 16px 12px}
+.status-group h3{margin:12px 0 8px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#7a8494}
+.status-frame{display:grid;gap:8px;padding:10px 0 14px;border-top:1px solid #e8ebef}
+.status-frame>strong{font-size:13px}
+.status-question,.status-summary{display:grid;gap:6px}
+.status-question p,.status-summary p,.status-comment{margin:0;font-size:13px;line-height:1.45}
+.status-comment{display:grid;gap:2px;text-align:left;padding:8px;border:1px solid #eadfb8;border-radius:8px;background:#fffdf6}
+.assumptions{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.assumptions li{display:grid;gap:6px;padding:8px;border:1px solid #e1e6ee;border-radius:8px}
+.assumptions p{margin:0}
+.assumption-actions{display:flex;gap:6px}
+.assumption-accepted{font-size:11px;color:#21643c}
+.assumption-rejected{font-size:11px;color:#8a3d3d}
+.assumption-pending{font-size:11px;color:#7a8494}
+.connect-sheet,.history-sheet{width:min(720px,100%)}
+.connect-tabs{display:flex;gap:6px;margin:8px 0 14px}
+.connect-tabs button{padding:6px 10px;border-radius:999px;background:#eef1f5}
+.connect-tabs button[aria-selected=true]{background:#25334a;color:#fff}
+.connect-command,.history-diff pre{margin:0 0 12px;padding:12px;overflow:auto;max-height:280px;border-radius:10px;background:#f4f6f8;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap}
+.history-layout{display:grid;grid-template-columns:220px 1fr;gap:16px}
+.history-list{list-style:none;margin:0;padding:0;display:grid;gap:8px;align-content:start}
+.history-list button{display:grid;gap:2px;text-align:left}
+.history-list button span{font-size:11px;color:#7a8494}
+.history-diff label{display:grid;gap:4px;margin-bottom:8px;font-size:12px;color:#7a8494}
+.research-note{position:fixed;z-index:25;left:24px;bottom:28px;width:min(300px,calc(100vw - 48px));max-height:220px;overflow:auto;padding:14px 16px;border:1px solid #eadfb8;border-radius:14px;background:#fffdf6;box-shadow:0 10px 30px #19283c14}
+.research-note h2{margin:0 0 8px;font-size:13px}
+.compare-frame-decision{margin:6px 0 0}
+@media(max-width:900px){.history-layout{grid-template-columns:1fr}.status-panel{left:10px}}
 .frame-warning { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 3; margin: 0; padding: 8px 12px; border-radius: 8px; background: #fff4e5; color: #7a4100; border: 1px solid #f3c78b; font-size: 12px; line-height: 1.4; pointer-events: none; }

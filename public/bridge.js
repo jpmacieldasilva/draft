@@ -1,8 +1,9 @@
 (() => {
   let mode = 'interact', outline, dragging, selected, originals = new Map();
-  const limits = {fontSize:[1,300],lineHeight:[0,500],padding:[0,500],margin:[-500,500],borderRadius:[0,500],gap:[0,500],width:[1,10000],height:[1,10000]};
-  const choices = {fontWeight:['100','200','300','400','500','600','700','800','900','normal','bold'],display:['block','inline','inline-block','flex','grid','none'],alignItems:['normal','stretch','start','end','center','baseline'],justifyContent:['normal','start','end','center','space-between','space-around','space-evenly']};
-  const properties = ['color','backgroundColor',...Object.keys(limits),...Object.keys(choices)];
+  const limits = {fontSize:[1,300],lineHeight:[0,500],padding:[0,500],margin:[-500,500],borderRadius:[0,500],borderWidth:[0,500],gap:[0,500],width:[1,10000],height:[1,10000]};
+  const choices = {fontWeight:['100','200','300','400','500','600','700','800','900','normal','bold'],display:['block','inline','inline-block','flex','grid','none'],alignItems:['normal','stretch','start','end','center','baseline'],justifyContent:['normal','start','end','center','space-between','space-around','space-evenly'],borderStyle:['solid','dashed','dotted','none']};
+  const colors = ['color','backgroundColor','borderColor'];
+  const properties = [...colors,...Object.keys(limits),...Object.keys(choices)];
   const fontLonghands = new Set(['fontSize','lineHeight','fontWeight','fontFamily','fontStyle','fontVariant']);
   function clear() { if(outline) outline.remove(); outline=undefined; }
   function paint(rect) {
@@ -24,7 +25,7 @@
     if(!styles||typeof styles!=='object'||Array.isArray(styles)) return false;
     return Object.entries(styles).every(([name,value])=>{
       if(typeof value!=='string'||value.length>100||!properties.includes(name)) return false;
-      if(name==='color'||name==='backgroundColor') return /^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|transparent)$/i.test(value)&&CSS.supports('color',value);
+      if(colors.includes(name)) return /^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|transparent)$/i.test(value)&&CSS.supports('color',value);
       if(choices[name]) return choices[name].includes(value);
       const number=Number(value.replace(/px$/,'')); return /^-?\d+(\.\d+)?px$/.test(value)&&Number.isFinite(number)&&number>=limits[name][0]&&number<=limits[name][1];
     });

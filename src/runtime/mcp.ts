@@ -73,7 +73,26 @@ export async function serveMcp(folder: string) {
   }, tool(async ({ frameId }: { frameId?: string }) => {
     const mine = (await store.loadPresence()).actors.find(actor => actor.id === actorId);
     if (frameId && mine && mine.frameId !== frameId) throw new RequestError(`Este agente não tem claim em ${frameId}.`);
-    return store.clearPresence({ id: actorId });
+    return store.release({ id: actorId });
+  }));
+  server.registerTool('ask_user', {
+    description: 'Pergunta ao designer. A pergunta fica na fila "precisa de você" até ser respondida no viewer.',
+    inputSchema: { frameId: z.string(), question: z.string().min(1).max(2000) },
+  }, tool(async ({ frameId, question }: { frameId: string; question: string }) => {
+    const other = await claimedByOther(frameId);
+    if (other) throw new RequestError(`Frame ${frameId} está em uso por ${other.label}.`, 409);
+    const workspace = await store.askUser(frameId, question, actorLabel);
+    const created = [...(workspace.questions ?? [])].reverse().find(item => item.frameId === frameId && item.prompt === question.trim());
+    return created ?? { frameId, prompt: question.trim(), status: 'open' };
+  }));
+  server.registerTool('submit_summary', {
+    description: 'Envia o resumo do que foi feito neste frame, incluindo o que o agente decidiu sozinho. Cada suposição pode ser aceita ou rejeitada no viewer.',
+    inputSchema: { frameId: z.string(), summary: z.string().min(1).max(8000), assumptions: z.array(z.string().min(1).max(500)).max(30).optional() },
+  }, tool(async ({ frameId, summary, assumptions }: { frameId: string; summary: string; assumptions?: string[] }) => {
+    const other = await claimedByOther(frameId);
+    if (other) throw new RequestError(`Frame ${frameId} está em uso por ${other.label}.`, 409);
+    const workspace = await store.submitSummary(frameId, summary, assumptions ?? [], actorLabel);
+    return workspace.summaries?.find(item => item.frameId === frameId) ?? { frameId, text: summary };
   }));
   server.registerTool('read_frame', {
     description: 'Lê um arquivo do frame (padrão: o HTML de entrada).',

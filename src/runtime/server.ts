@@ -41,6 +41,14 @@ export async function startRuntime(folder: string, port = 4173) {
         if (request.headers.origin && request.headers.origin !== viewerOrigin) throw new RequestError('Origem inválida.', 403);
         if (request.method === 'GET' && pathname === '/api/workspace') return send(response, 200, await store.snapshot());
         if (request.method === 'GET' && pathname === '/api/presence') return send(response, 200, await store.loadPresence());
+        if (request.method === 'GET') {
+          const sourceMatch = pathname.match(/^\/api\/frames\/([^/]+)\/source$/);
+          if (sourceMatch) return send(response, 200, await store.frameSource(decodeURIComponent(sourceMatch[1])));
+          const historyMatch = pathname.match(/^\/api\/frames\/([^/]+)\/history$/);
+          if (historyMatch) return send(response, 200, await store.frameHistory(decodeURIComponent(historyMatch[1])));
+          const diffMatch = pathname.match(/^\/api\/frames\/([^/]+)\/history\/([^/]+)$/);
+          if (diffMatch) return send(response, 200, await store.frameDiff(decodeURIComponent(diffMatch[1]), decodeURIComponent(diffMatch[2]), new URL(request.url || '/', viewerOrigin).searchParams.get('against') ?? undefined));
+        }
         if (request.method === 'GET' && pathname === '/api/events') { response.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' }); response.write(': connected\n\n'); clients.add(response); request.on('close', () => clients.delete(response)); return; }
         if (!['POST', 'DELETE'].includes(request.method || '')) throw new RequestError('Rota não encontrada.', 404);
         const token = request.headers['x-draft-token'] ?? request.headers['x-draftroom-token'];
@@ -70,8 +78,14 @@ export async function startRuntime(folder: string, port = 4173) {
         }
         if (request.method !== 'POST') throw new RequestError('Rota não encontrada.', 404);
         const payload = await body(request); let workspace;
-        if (pathname === '/api/selection') return send(response, 200, await store.saveSelection(payload));
-        if (pathname === '/api/layout') workspace = await store.saveLayout(payload);
+        const questionMatch = pathname.match(/^\/api\/frames\/([^/]+)\/questions\/([^/]+)$/);
+        const assumptionMatch = pathname.match(/^\/api\/frames\/([^/]+)\/assumptions\/([^/]+)$/);
+        const restoreMatch = pathname.match(/^\/api\/frames\/([^/]+)\/history\/([^/]+)\/restore$/);
+        if (questionMatch) workspace = await store.answerQuestion(decodeURIComponent(questionMatch[1]), decodeURIComponent(questionMatch[2]), String(payload.answer ?? ''));
+        else if (assumptionMatch) workspace = await store.decideAssumption(decodeURIComponent(assumptionMatch[1]), decodeURIComponent(assumptionMatch[2]), String(payload.status ?? ''));
+        else if (restoreMatch) workspace = await store.restoreHistory(decodeURIComponent(restoreMatch[1]), decodeURIComponent(restoreMatch[2]));
+        else if (pathname === '/api/selection') return send(response, 200, await store.saveSelection(payload));
+        else if (pathname === '/api/layout') workspace = await store.saveLayout(payload);
         else if (pathname === '/api/edits') workspace = await store.saveEdit(payload);
         else if (pathname === '/api/edges') workspace = await store.saveEdges(payload);
         else if (pathname === '/api/feedback') workspace = await store.feedback(payload);
@@ -88,13 +102,13 @@ export async function startRuntime(folder: string, port = 4173) {
   });
   try { viewerOrigin = await listen(viewer, port); } catch (error) { content.close(); throw error; }
   let timer: ReturnType<typeof setTimeout> | undefined; const changed = new Set<string>();
-  const watcher = watch(store.root, { recursive: true }, (_event, name) => { if (!name) return; const filename = name.split(path.sep).join('/').replace(/\.[0-9a-f-]{36}\.tmp$/, ''); if (filename.endsWith('.tmp') || filename.endsWith('selection.json')) return; changed.add(filename); clearTimeout(timer); timer = setTimeout(async () => {
+  const watcher = watch(store.root, { recursive: true }, (_event, name) => { if (!name) return; const filename = name.split(path.sep).join('/').replace(/\.[0-9a-f-]{36}\.tmp$/, ''); if (filename === '.git' || filename.startsWith('.git/') || filename.endsWith('.tmp') || filename.endsWith('selection.json')) return; changed.add(filename); clearTimeout(timer); timer = setTimeout(async () => {
     const files = [...changed]; changed.clear();
     const workspace = await store.snapshot();
     const assets = files.filter(file => !file.startsWith('.draft'));
     const frameIds = workspace.experiment.frames.filter(frame => assets.some(file => file === frame.entry || file.startsWith(`${path.dirname(frame.entry)}/`) || !workspace.experiment.frames.some(candidate => file.startsWith(`${path.dirname(candidate.entry)}/`)))).map(frame => frame.id);
     if (frameIds.length) broadcast({ type: 'reload', frameIds });
-    if (files.some(file => file === 'experiment.json' || file.endsWith('README.md') || file.startsWith('.draftroom') || file.startsWith('.draft'))) broadcast({ type: 'workspace' });
+    if (files.some(file => file === 'experiment.json' || file.endsWith('README.md') || file === 'research.md' || file.endsWith('/summary.json') || file.endsWith('/questions.json') || file.startsWith('.draftroom') || file.startsWith('.draft'))) broadcast({ type: 'workspace' });
     if (files.some(file => file.endsWith('presence.json'))) {
       const presence = await store.loadPresence();
       broadcast({ type: 'presence', actors: presence.actors });

@@ -22,7 +22,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
-- Published as `draft-viewer` on npm: `npx draft-viewer open <folder>`. The tarball ships only `dist/`, the studio example and the license.
+- Published as `draft-viewer` on npm: `npx draft-viewer open <folder>`. The tarball ships only `dist/`, the lista example and the license.
 - `draft mcp <folder>`: MCP server over stdio with `get_context`, `list_frames`, `get_selection`, `claim`, `release`, `read_frame`, `write_frame`, `resolve_feedback` and `update_manifest`. Writes stay inside `frames/<id>/` and respect other actors' claims.
 - The viewer shares the current Inspect or comment selection in `.draft/selection.json` (`POST /api/selection`) so agents can act on it.
 - English UI: `DRAFT_LANG=en` or `"locale": "en"` in `experiment.json` switches the viewer, the CLI and the agent rules.
@@ -38,9 +38,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - Agent contract in `AGENTS.md` and the `use-draft` skill: read context, claim, edit `frames/<id>/`, resolve, release.
 - E2E evidence harness: `e2e-evidence/evidence.json` and the Playwright report are uploaded by CI.
 
-- Root Cursor skill `use-draft` and README agent contract: any request to use Draft triggers clone-once, build-once, open `examples/studio` or project `canvas/`.
+- Root Cursor skill `use-draft` and README agent contract: any request to use Draft triggers clone-once, build-once, open `examples/lista` or project `canvas/`.
 - Public repository with MIT license and community docs.
-- Workspace agent contract (`examples/studio/AGENTS.md`) and Cursor start skill.
+- Workspace agent contract (`examples/lista/AGENTS.md`) and Cursor start skill.
 - English README focused on folder-first workflow.
 - Package rename to `draft-viewer` with `draft` CLI; state folder `.draft/` (reads legacy `.draftroom/`).
 - Bifurcated README for designers vs agents vs contributors.

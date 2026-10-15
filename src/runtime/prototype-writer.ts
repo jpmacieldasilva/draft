@@ -13,6 +13,7 @@ export interface EditBaseline {
   selector: string;
   writes: EditWrite[];
   text?: { previousHtml: string; written: string };
+  files?: Record<string, { original: string; written: string }>;
 }
 
 const STYLE_ATTR = /([a-z-]+)\s*:\s*([^;]+)/gi;
@@ -127,7 +128,8 @@ async function linkedCandidate(root: string, sheets: string[], document: HTMLEle
   return chosen;
 }
 
-export interface AppliedEdit { writes: EditWrite[]; text?: { previousHtml: string; written: string } }
+export interface AppliedEdit { writes: EditWrite[]; text?: { previousHtml: string; written: string }; files: Record<string, { before: string; after: string }> }
+export async function writeConfinedText(root: string, relative: string, content: string) { await writeText(root, relative, content); }
 
 export async function applyEdit(root: string, frame: Frame, edit: VisualEdit, sharedSheets: Set<string> = new Set()): Promise<AppliedEdit> {
   const htmlRelative = frame.entry.replace(/\\/g, '/');
@@ -137,7 +139,9 @@ export async function applyEdit(root: string, frame: Frame, edit: VisualEdit, sh
   if (nodes.length > 1) throw new RequestError('O seletor casa com mais de um elemento. Use um seletor único (id ou data-draftroom-id).', 409);
   const node = nodes[0] as HTMLElement | undefined;
   if (!node) throw new RequestError('Elemento não encontrado no protótipo.', 404);
-  const applied: AppliedEdit = { writes: [] };
+  const applied: AppliedEdit = { writes: [], files: {} };
+  const htmlBefore = html;
+  const sheetBefore = new Map<string, string>();
   if (edit.text !== undefined) {
     if (node.childNodes.some(child => child.nodeType === 1)) throw new RequestError('Edite texto apenas em elementos sem filhos.', 400);
     applied.text = { previousHtml: node.innerHTML, written: edit.text };
@@ -156,7 +160,8 @@ export async function applyEdit(root: string, frame: Frame, edit: VisualEdit, sh
     }
     const candidate = await linkedCandidate(root, sheets, document, node, cssProperty);
     if (candidate) {
-      const sheet = sheetEdits.get(candidate.file) ?? postcss.parse(await readFile(await confined(root, candidate.file), 'utf8'));
+      if (!sheetBefore.has(candidate.file)) sheetBefore.set(candidate.file, await readFile(await confined(root, candidate.file), 'utf8'));
+      const sheet = sheetEdits.get(candidate.file) ?? postcss.parse(sheetBefore.get(candidate.file) ?? '');
       sheetEdits.set(candidate.file, sheet);
       const rule = rulesBySelector(sheet, candidate.rule)[candidate.index];
       applied.writes.push({ file: candidate.file, location: { kind: 'sheet', rule: candidate.rule, index: candidate.index }, property: cssProperty, previous: findDecl(rule, cssProperty)?.value ?? null, written: value });
@@ -176,8 +181,14 @@ export async function applyEdit(root: string, frame: Frame, edit: VisualEdit, sh
     applied.writes.push({ file: htmlRelative, location: { kind: 'inline' }, property: cssProperty, previous: null, written: value });
     setInline(node, cssProperty, value);
   }
-  for (const [file, sheet] of sheetEdits) await writeText(root, file, sheet.toString());
-  await writeText(root, htmlRelative, document.toString());
+  for (const [file, sheet] of sheetEdits) {
+    const after = sheet.toString();
+    applied.files[file] = { before: sheetBefore.get(file) ?? after, after };
+    await writeText(root, file, after);
+  }
+  const htmlAfter = document.toString();
+  applied.files[htmlRelative] = { before: htmlBefore, after: htmlAfter };
+  await writeText(root, htmlRelative, htmlAfter);
   return applied;
 }
 
@@ -193,6 +204,9 @@ export function mergeBaseline(frameId: string, selector: string, existing: EditB
     else baseline.writes.push(write);
   }
   if (applied.text) baseline.text = baseline.text ? { previousHtml: baseline.text.previousHtml, written: applied.text.written } : applied.text;
+  const files = { ...(baseline.files ?? {}) };
+  for (const [file, snap] of Object.entries(applied.files)) files[file] = files[file] ? { original: files[file].original, written: snap.after } : { original: snap.before, written: snap.after };
+  baseline.files = files;
   return baseline;
 }
 

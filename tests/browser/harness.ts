@@ -22,7 +22,7 @@ async function hashTree(root: string, relative = ''): Promise<Record<string, str
 
 export async function copyStudio(): Promise<string> {
  const folder = await mkdtemp(path.join(tmpdir(), 'draft-e2e-'));
- await cp('examples/studio', folder, { recursive: true, filter: source => !source.split(path.sep).some(segment => segment === '.draftroom' || segment === '.draft') });
+ await cp('examples/lista', folder, { recursive: true, filter: source => !source.split(path.sep).some(segment => segment === '.draftroom' || segment === '.draft') });
  return folder;
 }
 

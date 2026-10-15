@@ -34,15 +34,15 @@
     "dist",
     "LICENSE",
     "NOTICE",
-    "examples/studio/experiment.json",
-    "examples/studio/README.md",
-    "examples/studio/AGENTS.md",
-    "examples/studio/frames",
-    "examples/studio/shared"
+    "examples/lista/experiment.json",
+    "examples/lista/README.md",
+    "examples/lista/AGENTS.md",
+    "examples/lista/research.md",
+    "examples/lista/frames"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.runtime.json && vite build",
-    "demo": "npm run build && node dist/runtime/cli.js open examples/studio",
+    "demo": "npm run build && node dist/runtime/cli.js open examples/lista",
     "start": "node dist/runtime/cli.js open",
     "test": "tsx --test tests/*.test.ts",
     "test:e2e": "playwright test",

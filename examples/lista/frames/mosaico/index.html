@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mosaico colorido</title>
+<style>
+*{box-sizing:border-box;margin:0}
+body{font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;background:#faf8f3;color:#1f1d1a;-webkit-font-smoothing:antialiased;padding:24px 28px 40px}
+.bar{max-width:560px;margin:0 auto;display:flex;align-items:center;gap:10px;border:2px solid #1f1d1a;border-radius:999px;padding:6px 6px 6px 8px;background:#fff}
+.bar .new{background:#f0eee8;border-radius:999px;padding:6px 12px;font-size:13px;color:#6b6760}
+.bar input{flex:1;border:0;outline:0;font:inherit;font-size:15px;background:none}
+.bar button{width:32px;height:32px;border-radius:50%;border:0;background:#1f1d1a;color:#fff;font-size:16px;cursor:pointer}
+.hint{text-align:center;font-size:11.5px;color:#9a958c;margin:7px 0 14px}
+.tabs{display:flex;justify-content:center;gap:4px;flex-wrap:wrap;margin-bottom:20px}
+.tab{border:0;background:none;border-radius:999px;padding:5px 11px;font:inherit;font-size:12.5px;color:#4a463f;cursor:pointer;display:flex;align-items:center;gap:6px}
+.tab i{width:7px;height:7px;border-radius:50%}
+.tab b{font-weight:500;color:#9a958c}
+.tab.on{background:#1f1d1a;color:#fff}.tab.on b{color:#aaa}
+.grid{columns:3 230px;column-gap:12px;max-width:900px;margin:0 auto}
+.c{break-inside:avoid;margin-bottom:12px;border-radius:16px;padding:16px 16px 14px}
+.tasks{background:#dbe6ff}.date{background:#ffd9cf}.buy{background:#d5f1df}.link{background:#e6defd}.note{background:#fff0b8}
+.head{display:flex;align-items:center;justify-content:space-between;font-weight:700;font-size:15px;margin-bottom:10px}
+.head small{font-size:12px;font-weight:600;opacity:.6}
+.tasks .head{color:#1f47b8}.buy .head{color:#17663a}
+.li{display:flex;align-items:center;gap:9px;padding:5px 0;cursor:pointer;font-size:13.5px}
+.ck{width:16px;height:16px;border-radius:50%;border:1.6px solid currentColor;opacity:.45;flex:none}
+.done .ck{opacity:1;background:currentColor}
+.done .t{text-decoration:line-through;opacity:.45}
+.tasks .li{color:#1f47b8}.tasks .t{color:#1f1d1a}.buy .li{color:#17663a}.buy .t{color:#1f1d1a}
+.pr{margin-left:auto;white-space:nowrap;padding-left:8px;font-variant-numeric:tabular-nums;color:#4a463f;font-size:12.5px}
+.total{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid rgba(23,102,58,.2);margin-top:8px;padding-top:10px;color:#17663a;font-size:12px;font-weight:600}
+.total strong{font-size:20px}
+.big{display:flex;align-items:flex-start;gap:8px;color:#c2361f}
+.big strong{font-size:52px;line-height:.9;font-weight:800;letter-spacing:-.03em}
+.big span{font-size:12px;font-weight:700;line-height:1.25;padding-top:4px}
+.big span em{font-style:normal;font-weight:500;display:block;opacity:.8}
+.date h3{font-size:15px;margin:10px 0 9px}
+.pill{display:inline-block;font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 9px;background:#fff;color:#c2361f}
+.pill.hot{background:#c2361f;color:#fff}
+.src{display:flex;align-items:center;gap:8px;font:12px ui-monospace,Menlo,monospace;color:#5b4fa8}
+.src i{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;font:700 12px/1 sans-serif;font-style:normal;color:#fff;background:#6d4aff}
+.link h3{font-size:15px;margin:10px 0}
+.link a{font-size:12.5px;font-weight:600;color:#5b4fa8;text-decoration:none}
+.note p{font-size:14px;line-height:1.5;margin:8px 0 10px}
+.note small{font-size:11.5px;color:#8a6d00;font-weight:600}
+.ni{width:22px;height:22px;border:1.6px solid #8a6d00;border-radius:5px;opacity:.7}
+</style>
+</head>
+<body>
+<label class="bar" data-draftroom-id="entrada"><span class="new">+ Novo</span><input placeholder="O que vai pra lista? Tente “2x leite R$ 5,90”" aria-label="Novo item"><button aria-label="Adicionar">↑</button></label>
+<p class="hint">O tipo é detectado sozinho · Tab troca · ⌘K foca</p>
+<div class="tabs">
+  <button class="tab on">Tudo <b>14</b></button><button class="tab"><i style="background:#e0533a"></i>Datas <b>4</b></button><button class="tab"><i style="background:#3b6cf0"></i>Tarefas <b>3</b></button><button class="tab"><i style="background:#22a05a"></i>Compras <b>3</b></button><button class="tab"><i style="background:#7a5cf0"></i>Links <b>2</b></button><button class="tab"><i style="background:#d4a300"></i>Notas <b>2</b></button>
+</div>
+<div class="grid">
+  <div class="c tasks"><div class="head">◎ Tarefas <small>3 abertas</small></div>
+    <div class="li"><span class="ck"></span><span class="t">Responder o e-mail do contador</span></div>
+    <div class="li"><span class="ck"></span><span class="t">Levar o notebook para revisão</span></div>
+    <div class="li"><span class="ck"></span><span class="t">Marcar call com o time de design</span></div>
+    <div class="li done"><span class="ck"></span><span class="t">Pagar conta de luz</span></div></div>
+  <div class="c date"><div class="big"><strong>15</strong><span>Quinta-feira<em>de outubro</em></span></div><h3>Dentista — Dra. Helena</h3><span class="pill hot">Amanhã</span></div>
+  <div class="c date"><div class="big"><strong>17</strong><span>Sábado<em>de outubro</em></span></div><h3>Entrega do relatório trimestral</h3><span class="pill">Em 3 dias</span></div>
+  <div class="c date"><div class="big"><strong>19</strong><span>Segunda-feira<em>de outubro</em></span></div><h3>Aniversário da Marina</h3><span class="pill">Em 5 dias</span></div>
+  <div class="c date"><div class="big"><strong>1</strong><span>Domingo<em>de novembro</em></span></div><h3>Renovar passaporte</h3><span class="pill">Em 18 dias</span></div>
+  <div class="c buy"><div class="head">🛒 Compras <small>3 na lista</small></div>
+    <div class="li"><span class="ck"></span><span class="t">2× Leite integral</span><span class="pr">R$ 11,80</span></div>
+    <div class="li"><span class="ck"></span><span class="t">Café em grãos</span><span class="pr">R$ 42,50</span></div>
+    <div class="li"><span class="ck"></span><span class="t">Pão de fermentação natural</span><span class="pr">R$ 18,00</span></div>
+    <div class="li done"><span class="ck"></span><span class="t">3× Detergente</span><span class="pr">R$ 8,37</span></div>
+    <div class="total">Falta comprar <strong>R$ 72,30</strong></div></div>
+  <div class="c link"><div class="src"><i>D</i>developer.apple.com</div><h3>Human Interface Guidelines — Layout</h3><a href="#">Abrir ↗</a></div>
+  <div class="c link"><div class="src"><i style="background:#e5603a">P</i>panelinha.com.br</div><h3>Receita de focaccia de longa fermentação</h3><a href="#">Abrir ↗</a></div>
+  <div class="c note"><div class="ni"></div><p>Ideia para o fim de semana: subir a serra no sábado cedo, almoçar em Monte Verde e voltar antes do trânsito.</p><small>há 3 horas</small></div>
+  <div class="c note"><div class="ni"></div><p>Senha do Wi-Fi do escritório novo fica com a recepção. Pedir ao Rafael na segunda.</p><small>há 2 dias</small></div>
+</div>
+<script>
+document.querySelectorAll('.li').forEach(r=>r.addEventListener('click',()=>r.classList.toggle('done')));
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t))));
+document.querySelectorAll('a[href="#"]').forEach(a=>a.addEventListener('click',e=>e.preventDefault()));
+</script>
+</body>
+</html>

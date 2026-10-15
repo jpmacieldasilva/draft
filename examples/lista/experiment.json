@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "id": "lista-minimalista",
+  "title": "Lista que entende o que você escreve",
+  "locale": "pt-BR",
+  "decision": {
+    "hypothesis": "Se a lista reconhecer sozinha o tipo de cada item (tarefa, link, compra, nota, data) a partir de uma única barra de entrada, as pessoas capturam mais coisas por dia do que numa lista comum, sem precisar escolher categoria antes de escrever.",
+    "criteria": "Escolhemos a variação em que, num teste com 6 pessoas, mais itens são capturados em 2 minutos e ninguém precisa perguntar onde fica uma compra ou uma data."
+  },
+  "frames": [
+    { "id": "base", "title": "Base clara", "entry": "frames/base/index.html", "viewport": { "width": 960, "height": 680 }, "role": "control", "group": "lista", "state": "Tudo", "tests": "Referência: barra de entrada no topo e grupos por tipo em uma coluna.", "signal": "Itens capturados em 2 min" },
+    { "id": "launcher", "title": "Launcher escuro", "entry": "frames/launcher/index.html", "viewport": { "width": 960, "height": 680 }, "role": "variant", "group": "lista", "state": "Busca aberta", "tests": "Uma paleta de comandos sobre um fundo suave deixa a captura mais rápida para quem vive no teclado.", "signal": "Itens capturados sem usar o mouse" },
+    { "id": "mosaico", "title": "Mosaico colorido", "entry": "frames/mosaico/index.html", "viewport": { "width": 960, "height": 680 }, "role": "variant", "group": "lista", "state": "Tudo", "tests": "Cores por tipo e datas grandes deixam a lista escaneável num relance.", "signal": "Tempo para achar a próxima data" },
+    { "id": "lateral", "title": "Compacta com barra lateral", "entry": "frames/lateral/index.html", "viewport": { "width": 960, "height": 680 }, "role": "variant", "group": "lista", "state": "Compras", "tests": "Uma barra lateral com contadores por tipo ajuda quem tem muitos itens a filtrar sem rolar.", "signal": "Cliques até filtrar por tipo" }
+  ],
+  "edges": []
+}

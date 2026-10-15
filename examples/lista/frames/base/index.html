@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Base clara</title>
+<style>
+*{box-sizing:border-box;margin:0}
+:root{--bg:#f7f7f5;--card:#fff;--line:#e8e7e3;--ink:#1d1d1f;--mute:#8a8a8e;--accent:#2563eb;--red:#d93a2b;--green:#1f9d55}
+body{font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+.top{position:sticky;top:0;z-index:2;background:linear-gradient(var(--bg) 80%,transparent);padding:22px 0 10px}
+.wrap{max-width:680px;margin:0 auto;padding:0 24px}
+.input{display:flex;align-items:center;gap:10px;background:var(--card);border:1.5px solid var(--accent);border-radius:12px;padding:10px 12px;box-shadow:0 0 0 4px rgba(37,99,235,.10),0 1px 2px rgba(0,0,0,.04)}
+.input .new{font-size:12px;color:var(--mute);border:1px solid var(--line);border-radius:7px;padding:3px 8px;white-space:nowrap}
+.input input{flex:1;border:0;outline:0;font:inherit;background:transparent;color:var(--ink)}
+.input input::placeholder{color:#a9a9ad}
+.hint{font-size:11.5px;color:var(--mute);margin:7px 2px 0}
+kbd{font:inherit;font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:#fff}
+.chips{display:flex;gap:6px;margin-top:14px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 11px;font-size:12.5px;color:#444;cursor:pointer}
+.chip b{color:var(--mute);font-weight:500;margin-left:4px}
+.chip.on{background:var(--ink);border-color:var(--ink);color:#fff}.chip.on b{color:#bbb}
+section{margin:22px 0}
+h2{font-size:13px;font-weight:600;margin-bottom:9px;display:flex;align-items:baseline;gap:6px}
+h2 span{color:var(--mute);font-weight:400}
+h2 .right{margin-left:auto;font-size:12px;color:#555}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:11px 13px;display:flex;align-items:center;gap:12px}
+.date{width:44px;text-align:center;border-radius:8px;background:#fdecea;color:var(--red);padding:3px 0;line-height:1.1}
+.date small{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.03em}
+.date strong{font-size:20px;font-weight:600}
+.title{font-weight:500}.sub{font-size:12px;color:var(--mute)}.sub.soon{color:var(--red)}
+.rows{display:flex;flex-direction:column;gap:6px}
+.row{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:11px;cursor:pointer}
+.row:hover{border-color:#d6d5d0}
+.check{width:17px;height:17px;border-radius:50%;border:1.5px solid #c9c8c4;flex:none;display:grid;place-items:center}
+.done .check{background:var(--accent);border-color:var(--accent)}
+.done .check::after{content:"";width:7px;height:4px;border:2px solid #fff;border-top:0;border-right:0;transform:rotate(-45deg) translate(1px,-1px)}
+.done .label{color:var(--mute);text-decoration:line-through}
+.sq{border-radius:5px}.buy.done .check{background:var(--green);border-color:var(--green)}
+.qty{color:var(--mute);font-size:12px;width:20px}
+.price{margin-left:auto;font-variant-numeric:tabular-nums;color:#444}
+.fav{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;font-weight:600;font-size:12px;color:#fff;flex:none}
+.url{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--mute)}
+.note{background:#fffbea;border-color:#f3e7b3;display:block}
+.note p{margin-bottom:6px}
+</style>
+</head>
+<body>
+<div class="top"><div class="wrap">
+  <label class="input" data-draftroom-id="entrada"><span class="new">+ Novo</span><input placeholder="Escreva algo — “2x leite R$ 5,90”, “sexta: dentista”, um link…" aria-label="Novo item"></label>
+  <p class="hint">O tipo é detectado sozinho. <kbd>Tab</kbd> troca, <kbd>Esc</kbd> limpa.</p>
+  <div class="chips" role="tablist">
+    <button class="chip on" data-f="all">Tudo<b>14</b></button><button class="chip" data-f="datas">Datas<b>4</b></button><button class="chip" data-f="tarefas">Tarefas<b>3</b></button><button class="chip" data-f="compras">Compras<b>3</b></button><button class="chip" data-f="links">Links<b>2</b></button><button class="chip" data-f="notas">Notas<b>2</b></button>
+  </div>
+</div></div>
+<main class="wrap">
+  <section data-g="datas"><h2>Datas <span>4</span></h2>
+    <div class="grid">
+      <div class="card"><div class="date"><small>Qui</small><strong>15</strong><small>Out</small></div><div><div class="title">Dentista — Dra. Helena</div><div class="sub soon">Amanhã</div></div></div>
+      <div class="card"><div class="date"><small>Sáb</small><strong>17</strong><small>Out</small></div><div><div class="title">Entrega do relatório trimestral</div><div class="sub">Em 3 dias</div></div></div>
+      <div class="card"><div class="date"><small>Seg</small><strong>19</strong><small>Out</small></div><div><div class="title">Aniversário da Marina</div><div class="sub">Em 5 dias</div></div></div>
+      <div class="card"><div class="date"><small>Dom</small><strong>1</strong><small>Nov</small></div><div><div class="title">Renovar passaporte</div><div class="sub">Em 18 dias</div></div></div>
+    </div></section>
+  <section data-g="tarefas"><h2>Tarefas <span>3</span></h2>
+    <div class="rows">
+      <div class="row t"><span class="check"></span><span class="label">Responder o e-mail do contador</span></div>
+      <div class="row t"><span class="check"></span><span class="label">Levar o notebook para revisão</span></div>
+      <div class="row t"><span class="check"></span><span class="label">Marcar call com o time de design</span></div>
+      <div class="row t done"><span class="check"></span><span class="label">Pagar conta de luz</span></div>
+    </div></section>
+  <section data-g="compras"><h2>Compras <span>3</span><span class="right">Faltam <b>R$ 72,30</b></span></h2>
+    <div class="rows">
+      <div class="row t buy"><span class="check sq"></span><span class="qty">2×</span><span class="label">Leite integral</span><span class="price">R$ 11,80</span></div>
+      <div class="row t buy"><span class="check sq"></span><span class="qty"></span><span class="label">Café em grãos</span><span class="price">R$ 42,50</span></div>
+      <div class="row t buy"><span class="check sq"></span><span class="qty"></span><span class="label">Pão de fermentação natural</span><span class="price">R$ 18,00</span></div>
+      <div class="row t buy done"><span class="check sq"></span><span class="qty">3×</span><span class="label">Detergente</span><span class="price">R$ 8,37</span></div>
+    </div></section>
+  <section data-g="links"><h2>Links <span>2</span></h2>
+    <div class="grid">
+      <div class="card"><span class="fav" style="background:#6d4aff">D</span><div><div class="url">developer.apple.com</div><div class="title">Human Interface Guidelines — Layout</div></div></div>
+      <div class="card"><span class="fav" style="background:#e5603a">P</span><div><div class="url">panelinha.com.br</div><div class="title">Receita de focaccia de longa fermentação</div></div></div>
+    </div></section>
+  <section data-g="notas"><h2>Notas <span>2</span></h2>
+    <div class="grid">
+      <div class="card note"><p>Ideia para o fim de semana: subir a serra no sábado cedo, almoçar em Monte Verde e voltar antes do trânsito.</p><div class="sub">há 3 horas</div></div>
+      <div class="card note"><p>Senha do Wi-Fi do escritório novo fica com a recepção. Pedir ao Rafael na segunda.</p><div class="sub">há 2 dias</div></div>
+    </div></section>
+</main>
+<script>
+document.querySelectorAll('.t').forEach(r=>r.addEventListener('click',()=>r.classList.toggle('done')));
+document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{document.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c));const f=c.dataset.f;document.querySelectorAll('section').forEach(s=>s.hidden=f!=='all'&&s.dataset.g!==f)}));
+</script>
+</body>
+</html>
