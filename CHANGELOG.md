@@ -4,13 +4,15 @@ All notable changes to this project will be documented in this file.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [1.0.0] - 2026-10-27
+
+First published version. The canvas, the lista example, Inspect, pin comments, the agent contract and Git history are one release.
 
 ### Changed
 
-- The canvas toolbar is icons only: pan, select, inspect, comment, and zoom. The top bar keeps the mark, the project name, **Adicionar protótipo**, and **Conectar agente** only while no agent is connected. Comments open in a popover on the pin; the side panel only lists them. The role chip is a plain label. Compare, the info dialog, the research card, and the Status control are gone. Zoom changes the canvas, not the bars around it. Documents from `research.md` on the canvas are a follow-up.
-- Canvas frames use the frame shadow and a 12px radius, with 96px between frames. The frame name stays visible; size and frame actions appear when the frame is selected or focused. Flow filters live in the side panel. The top bar keeps the project name and **Adicionar protótipo**.
-- Frame headers show the name, a 6px state dot, and the role chip. Status words are the dot tooltip; the terracotta dot opens the agent question in the side panel. Small labels above titles and helper lines are removed. Compare shows the hypothesis and the criterion once.
+- The canvas toolbar is icons only: pan, select, inspect, comment, and zoom. The top bar keeps the mark, the project name, **Adicionar protótipo**, and **Conectar agente** only while no agent is connected. Comments open in a popover on the pin; the side panel only lists them. The role chip is a plain label, **Controle** or **Variante**, with no separate compare view. Zoom changes the canvas, not the bars around it. Documents from `research.md` on the canvas are a follow-up.
+- Canvas frames use the frame shadow and a 12px radius, with 96px between frames. The frame name stays visible; size and frame actions appear when the frame is selected or focused. The included study is `examples/lista`.
+- Frame headers show the name, a 6px state dot, and the role chip. Status words are the dot tooltip; the terracotta dot opens the agent question in the side panel. Small labels above titles and helper lines are removed.
 - Every state dot is a keyboard-focusable button with an accessible name. **Precisa de você** is an 8px dot with a 2px ring; Enter or Space opens the question.
 - **Breaking:** flow connections are stored in `experiment.json` (`edges`) instead of `.draft/layout.json`, so they are shared through Git. Existing connections are migrated on open. `POST /api/edges` replaces the layout field.
 
@@ -34,7 +36,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - Navigable study: `data-draft-goto="<frameId>"` inside a prototype jumps to that frame while presenting (selects and centers it on the canvas); arrow keys follow `edges` with a back history; the presentation bar lists the next steps. Unknown targets show a notice.
 - `draft export` keeps comments (read-only) and edges; `--no-feedback` leaves comments out.
 - Manifest `schemaVersion: 2`: frame `state`, `role` (control/variant), `group`, `tests`, `signal`; study `decision` (hypothesis, criteria); flow `edges`. Invalid or duplicate edges and multiple controls per group show a diagnostic instead of breaking the viewer.
-- Frame badges for state and role, decision and frame metadata in the info panel, and **Comparar** (control vs. variant side by side with the criteria).
+- Frame state dot and role chip. The study `decision` stays in the manifest and in `draft context`. There is no side-by-side compare view.
+- `ask_user` and `submit_summary` on `draft mcp`. Questions and assumptions are answered from the frame's state dot. In a Git repository, Inspect saves and claim releases commit `draft(<frameId>): …`, and the frame menu can restore an earlier commit of `frames/<id>/`.
 - `draft create --flow` scaffolds empty, loading, success and error states with edges.
 - `draft context` includes `schemaVersion`, `decision`, `edges` and frame metadata.
 - `draft context <folder>`: manifest, READMEs, frame files, open comments, active claims and emission rules in one JSON for agents.

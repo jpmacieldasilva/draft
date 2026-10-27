@@ -38,7 +38,7 @@ Opens the included lista study (`examples/lista`). Copy that folder when you sta
 - **History** — in a Git repository, the frame menu lists commits that touch `frames/<id>/`, shows the diff, and can restore that version as a new commit `draft(<id>): restaurar <sha>`. Without Git, the top bar shows **Sem Git** and history says it is unavailable; the canvas keeps working.
 - **Código** — switches that frame to a read-only view of its HTML. **Prévia** returns to the live iframe.
 - **Conectar agente** — copies a stdio command already pointed at this workspace folder. The button sits in the top bar only while no agent is connected; after that, the same dialog lives under **Configurações**. Read-only export bundles omit that absolute path.
-- **Comment** — pin a point or drag a region next to the pixels.
+- **Comment** — drag a region on the prototype. The note stays on a pin and opens in a popover; the side panel lists the thread.
 - **Present the flow** — in presentation mode, arrow keys follow `edges` (← goes back), the bar lists the next steps, and any element with `data-draft-goto="<frameId>"` inside a prototype jumps to that frame. On the canvas the same link selects and centers the target.
 - **Share** — same folder via Git or zip; `draft export` builds a read-only bundle with the flow and the comments (add `--no-feedback` to leave comments out).
 

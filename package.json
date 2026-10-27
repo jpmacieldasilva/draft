@@ -1,6 +1,6 @@
 {
   "name": "draft-viewer",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Local, folder-first viewer for HTML prototypes: canvas, Inspect, visual feedback, flows and an agent contract (CLI + MCP).",
   "license": "MIT",
   "author": "João Paulo da Silva",
